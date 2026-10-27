@@ -1,0 +1,38 @@
+# Local development services: PostgreSQL + Redis.
+#   npm run db:up      start them in the background
+#   npm run db:down    stop them (data stays in the volumes)
+# The values match apps/api/.env.example.
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: postflow
+      POSTGRES_PASSWORD: postflow
+      POSTGRES_DB: postflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postflow -d postflow"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    # appendonly: Redis writes every change to disk, so scheduled jobs survive a restart.
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres-data:
+  redis-data:

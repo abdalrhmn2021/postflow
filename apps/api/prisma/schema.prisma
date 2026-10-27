@@ -1,0 +1,14 @@
+// PostFlow database schema.
+// Phase 0 has no tables yet - phase 1 adds Agency, User and Brand.
+// Change a model -> `npm run db:migrate -w api` (creates a migration and regenerates the client).
+
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}

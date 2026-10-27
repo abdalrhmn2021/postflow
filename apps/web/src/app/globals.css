@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+/* PostFlow colors. One place to change them; Tailwind classes read them (bg-surface, text-ink...). */
+:root {
+  --surface: #f7f7f5;
+  --card: #ffffff;
+  --ink: #16181d;
+  --muted: #5d6470;
+  --line: #e4e4e0;
+  --brand: #4f46e5;
+  --good: #15803d;
+  --bad: #b91c1c;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface: #0f1115;
+    --card: #171a20;
+    --ink: #eceef2;
+    --muted: #9aa1ad;
+    --line: #2a2e36;
+    --brand: #818cf8;
+    --good: #4ade80;
+    --bad: #f87171;
+  }
+}
+
+@theme inline {
+  --color-surface: var(--surface);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-brand: var(--brand);
+  --color-good: var(--good);
+  --color-bad: var(--bad);
+  /* System fonts for now (no download at build time). Phase 1 picks the brand fonts. */
+  --font-sans: "Segoe UI", Tahoma, "Noto Sans Arabic", system-ui, sans-serif;
+}
+
+body {
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-sans);
+}

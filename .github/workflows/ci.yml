@@ -1,0 +1,81 @@
+# Checks on every push to main and every pull request:
+#   format - Prettier, whole repo
+#   web    - Next.js: route types + TypeScript, ESLint, production build
+#   api    - NestJS: TypeScript, oxlint, unit tests, build, e2e tests on a real PostgreSQL + Redis
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Node 24 ships npm 11 (npm 10 has a bug installing this workspace layout).
+env:
+  NODE_VERSION: 24
+
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run format:check
+
+  web:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck -w web
+      - run: npm run lint -w web
+      - run: npm run build -w web
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+
+  api:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postflow
+          POSTGRES_PASSWORD: postflow
+          POSTGRES_DB: postflow_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postflow -d postflow_test"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postflow:postflow@localhost:5432/postflow_test
+      REDIS_URL: redis://localhost:6379
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci # also runs `prisma generate` (postinstall)
+      - run: npm run typecheck -w api
+      - run: npm run lint -w api
+      - run: npm test -w api
+      - run: npm run build -w api
+      # Phase 1 adds `npm run db:deploy -w api` here (apply the migrations) before the e2e tests.
+      - run: npm run test:e2e -w api
