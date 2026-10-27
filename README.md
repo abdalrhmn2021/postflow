@@ -49,7 +49,7 @@ postflow/
 
 ## Run locally
 
-**Requirements:** Node.js 24 (or Node 22 with `npm install -g npm@11`), and Docker Desktop.
+**Requirements:** Node.js 24 (or Node 22 with `npm install -g npm@11`), and either Docker Desktop or the two free cloud services below.
 
 ```bash
 npm install                          # installs both apps and generates the Prisma client
@@ -64,6 +64,17 @@ npm run dev:web                      # http://localhost:3000
 ```
 
 The home page shows a live status of the API, database, Redis and worker.
+
+### Without Docker (free cloud services)
+
+Skip `npm run db:up` and use two free hosted services instead - nothing to install:
+
+1. **PostgreSQL - [Neon](https://neon.com):** create a project, copy its connection string
+   (`postgresql://...neon.tech/neondb?sslmode=require`) into `DATABASE_URL` in `apps/api/.env`.
+2. **Redis - [Upstash](https://upstash.com):** create a Redis database, copy its `rediss://...` URL into `REDIS_URL`.
+
+Neon's free database sleeps after 5 idle minutes; the first request after that takes a moment longer.
+Upstash's free plan has a monthly command limit, which is plenty for development.
 
 ## Checks
 

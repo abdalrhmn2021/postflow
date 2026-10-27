@@ -5,7 +5,8 @@ import { HEARTBEAT_KEY } from "../worker/heartbeat.js";
 
 type Check = "up" | "down";
 
-const CHECK_TIMEOUT_MS = 2000;
+// 5 s, not less: a cloud database that sleeps when idle (Neon free plan) needs a moment to wake up.
+const CHECK_TIMEOUT_MS = 5000;
 
 // Resolves 'up' if the check finishes in time, 'down' if it throws or takes too long.
 async function probe(check: () => Promise<unknown>): Promise<Check> {
