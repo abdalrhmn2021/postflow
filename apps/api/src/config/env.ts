@@ -21,9 +21,24 @@ const envSchema = z.object({
 
   // Where the Next.js site runs - the only origin allowed to call the API (comma-separated for several).
   WEB_ORIGIN: z.string().default("http://localhost:3000"),
+
+  // Signs the login tokens. Anyone who knows it can log in as anyone, so: long, random, secret.
+  // Make one with:  node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
+  // Optional in development and tests (a fixed dev value is used); required in production - see below.
+  JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters").optional(),
+
+  // Which proxies in front of the API to trust for the visitor's real IP (X-Forwarded-For), used to
+  // limit login attempts per visitor. "loopback": the Next.js site on the same machine (development).
+  // A number = that many proxy hops (set when deploying, phase 7).
+  TRUST_PROXY: z
+    .string()
+    .default("loopback")
+    .transform((v) => (/^\d+$/.test(v) ? Number(v) : v)),
 });
 
-export type Env = z.infer<typeof envSchema>;
+const DEV_JWT_SECRET = "postflow-development-only-secret-do-not-use-in-production";
+
+export type Env = Omit<z.infer<typeof envSchema>, "JWT_SECRET"> & { JWT_SECRET: string };
 
 // Used by ConfigModule.forRoot({ validate }). Returns the cleaned values (defaults filled in, PORT a number).
 export function validateEnv(raw: Record<string, unknown>): Env {
@@ -32,5 +47,12 @@ export function validateEnv(raw: Record<string, unknown>): Env {
     const problems = result.error.issues.map((i) => `  - ${i.path.join(".") || "env"}: ${i.message}`);
     throw new Error(`Invalid environment variables:\n${problems.join("\n")}\nSee .env.example.`);
   }
-  return result.data;
+  const env = result.data;
+  if (!env.JWT_SECRET) {
+    if (env.NODE_ENV === "production") {
+      throw new Error("Invalid environment variables:\n  - JWT_SECRET: required in production\nSee .env.example.");
+    }
+    return { ...env, JWT_SECRET: DEV_JWT_SECRET };
+  }
+  return { ...env, JWT_SECRET: env.JWT_SECRET };
 }

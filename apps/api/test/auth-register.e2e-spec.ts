@@ -41,6 +41,7 @@ describe("POST /api/auth/register", () => {
     expect(res.body.agency).toMatchObject({ name: "سنتريفا", slug: `${RUN}-centriva`, plan: "FREE" });
     expect(res.body.user).toMatchObject({ name: "عبد الرحمن", email: `owner@${RUN}.test`, role: "OWNER" });
     expect(JSON.stringify(res.body)).not.toMatch(/password/i);
+    expect(res.headers["set-cookie"]?.[0]).toMatch(/^pf_session=/); // signed in straight away
 
     const saved = await prisma.user.findUniqueOrThrow({ where: { email: `owner@${RUN}.test` } });
     expect(saved.agencyId).toBe(res.body.agency.id);

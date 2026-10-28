@@ -28,4 +28,15 @@ describe("validateEnv", () => {
       /REDIS_URL[\s\S]*PORT|PORT[\s\S]*REDIS_URL/,
     );
   });
+
+  it("uses a development login secret when none is set, but requires one in production", () => {
+    expect(validateEnv(base).JWT_SECRET.length).toBeGreaterThanOrEqual(32);
+    expect(() => validateEnv({ ...base, NODE_ENV: "production" })).toThrow(/JWT_SECRET/);
+    expect(() => validateEnv({ ...base, JWT_SECRET: "too-short" })).toThrow(/32 characters/);
+  });
+
+  it("reads TRUST_PROXY as a hop count when it is a number", () => {
+    expect(validateEnv(base).TRUST_PROXY).toBe("loopback");
+    expect(validateEnv({ ...base, TRUST_PROXY: "2" }).TRUST_PROXY).toBe(2);
+  });
 });
