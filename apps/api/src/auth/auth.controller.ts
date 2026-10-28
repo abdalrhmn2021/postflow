@@ -4,9 +4,10 @@ import type { Request, Response } from "express";
 import { ZodValidationPipe } from "../common/zod-validation.pipe.js";
 import type { Env } from "../config/env.js";
 import { loginSchema, registerSchema, type LoginInput, type RegisterInput } from "./auth.schemas.js";
-import { AuthService } from "./auth.service.js";
+import { AuthService, toSession, type SessionUser } from "./auth.service.js";
+import { CurrentUser, Public } from "./decorators.js";
 import { LoginLimitService } from "./login-limit.service.js";
-import { readCookie, SESSION_COOKIE, sessionCookieOptions } from "./session.js";
+import { SESSION_COOKIE, sessionCookieOptions } from "./session.js";
 import { SessionService } from "./session.service.js";
 
 // Every answer that logs someone in has the same body: { user, agency }.
@@ -25,6 +26,7 @@ export class AuthController {
 
   // POST /api/auth/register -> 201 { user, agency } + login cookie (signed in straight away)
   // 400 VALIDATION_ERROR, 409 EMAIL_TAKEN / SLUG_TAKEN
+  @Public()
   @Post("register")
   async register(
     @Body(new ZodValidationPipe(registerSchema)) body: RegisterInput,
@@ -37,6 +39,7 @@ export class AuthController {
 
   // POST /api/auth/login -> 200 { user, agency } + login cookie
   // 400 VALIDATION_ERROR, 401 INVALID_CREDENTIALS, 429 TOO_MANY_ATTEMPTS
+  @Public()
   @Post("login")
   @HttpCode(200)
   async login(
@@ -51,6 +54,7 @@ export class AuthController {
   }
 
   // POST /api/auth/logout -> 204, cookie removed. Fine to call when already logged out.
+  @Public()
   @Post("logout")
   @HttpCode(204)
   logout(@Res({ passthrough: true }) res: Response) {
@@ -58,12 +62,11 @@ export class AuthController {
     res.clearCookie(SESSION_COOKIE, options);
   }
 
-  // GET /api/auth/me -> 200 { user, agency }, 401 UNAUTHENTICATED
+  // GET /api/auth/me -> 200 { user, agency }, 401 UNAUTHENTICATED (from AuthGuard)
   // The website calls this on load to know who is signed in.
   @Get("me")
-  async me(@Req() req: Request) {
-    const userId = await this.sessions.verify(readCookie(req.headers.cookie, SESSION_COOKIE));
-    return this.auth.me(userId);
+  me(@CurrentUser() user: SessionUser) {
+    return toSession(user);
   }
 
   private async setCookie(res: Response, userId: string) {

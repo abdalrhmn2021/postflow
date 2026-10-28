@@ -16,17 +16,19 @@ export const notLoggedIn = () => new UnauthorizedException({ code: "UNAUTHENTICA
 // The columns a signed-in user and their agency are sent to the website with - passwordHash never is.
 const sessionSelect = {
   id: true,
+  agencyId: true, // every query in a feature is scoped by it: WHERE "agencyId" = user.agencyId
   name: true,
   email: true,
   role: true,
   agency: { select: { id: true, name: true, slug: true, plan: true } },
 } satisfies Prisma.UserSelect;
 
-type SessionUser = Prisma.UserGetPayload<{ select: typeof sessionSelect }>;
+// The logged-in user as routes get it from @CurrentUser().
+export type SessionUser = Prisma.UserGetPayload<{ select: typeof sessionSelect }>;
 
 // { user, agency } - the same shape for register, login and /me.
-function toSession({ agency, ...user }: SessionUser) {
-  return { user, agency };
+export function toSession({ id, name, email, role, agency }: SessionUser) {
+  return { user: { id, name, email, role }, agency };
 }
 
 // Which unique column a Prisma "unique constraint failed" (P2002) error is about, if any.
@@ -96,10 +98,9 @@ export class AuthService {
     return toSession(rest);
   }
 
-  // The signed-in user, freshly read: a deleted user is logged out at once, a changed role applies at once.
-  async me(userId: string | null) {
-    const user = userId ? await this.prisma.user.findUnique({ where: { id: userId }, select: sessionSelect }) : null;
-    if (!user) throw notLoggedIn();
-    return toSession(user);
+  // Read on every request by AuthGuard, never taken from the token: a deleted user is logged out
+  // at once, and a changed role applies at once. One lookup by primary key - fast.
+  findSessionUser(userId: string): Promise<SessionUser | null> {
+    return this.prisma.user.findUnique({ where: { id: userId }, select: sessionSelect });
   }
 }

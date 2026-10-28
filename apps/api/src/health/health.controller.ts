@@ -2,6 +2,7 @@ import { Controller, Get, Logger, ServiceUnavailableException } from "@nestjs/co
 import { PrismaService } from "../prisma/prisma.service.js";
 import { RedisService } from "../redis/redis.service.js";
 import { HEARTBEAT_KEY } from "../worker/heartbeat.js";
+import { Public } from "../auth/decorators.js";
 
 type Check = "up" | "down";
 
@@ -38,6 +39,7 @@ async function probe(name: string, check: () => Promise<unknown>): Promise<Check
 // GET /api/health - used by the host (Render, a VPS monitor) and by CI.
 // 200 when the database and Redis answer, 503 when one of them doesn't.
 // The worker's state is reported but never fails the check: the API can serve pages without it.
+@Public() // the host and CI call it without logging in
 @Controller("health")
 export class HealthController {
   constructor(
