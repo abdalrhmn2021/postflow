@@ -77,5 +77,5 @@ jobs:
       - run: npm run lint -w api
       - run: npm test -w api
       - run: npm run build -w api
-      # Phase 1 adds `npm run db:deploy -w api` here (apply the migrations) before the e2e tests.
+      - run: npm run db:deploy -w api # apply the migrations to the empty test database
       - run: npm run test:e2e -w api

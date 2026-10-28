@@ -1,5 +1,4 @@
 // PostFlow database schema.
-// Phase 0 has no tables yet - phase 1 adds Agency, User and Brand.
 // Change a model -> `npm run db:migrate -w api` (creates a migration and regenerates the client).
 
 generator client {
@@ -11,4 +10,77 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+// Agency staff. The client (brand owner) has no account: they only open an approval link (phase 5).
+enum Role {
+  OWNER // everything: brands, connected accounts, staff, settings
+  MANAGER // creates, schedules and publishes posts for every brand
+  EDITOR // drafts posts for the brands assigned to them only
+}
+
+enum Plan {
+  FREE
+  PRO
+}
+
+// The tenant. Everything else belongs to one agency (agencyId), like a business in BookFlow.
+model Agency {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique // in URLs: postflow.app/centriva
+  plan      Plan     @default(FREE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users  User[]
+  brands Brand[]
+}
+
+model User {
+  id           String   @id @default(uuid())
+  // Unique across the whole site: the login form asks for email + password only, not the agency.
+  email        String   @unique
+  name         String
+  passwordHash String // never the password itself
+  role         Role     @default(EDITOR)
+  agencyId     String
+  agency       Agency   @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  brands BrandMember[]
+
+  @@index([agencyId])
+}
+
+// An agency's client (a business whose pages the agency runs).
+model Brand {
+  id        String   @id @default(uuid())
+  name      String
+  language  String   @default("ar")
+  voice     String? // how the brand talks - given to the AI when it drafts captions (phase 6)
+  timezone  String   @default("Asia/Hebron") // the calendar shows times in this zone; the database stores UTC
+  agencyId  String
+  agency    Agency   @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members BrandMember[]
+
+  // Two brands with the same name in one agency: no. The same name in two agencies: fine.
+  @@unique([agencyId, name])
+  @@index([agencyId])
+}
+
+// Which editors work on which brand (many-to-many between User and Brand).
+model BrandMember {
+  userId    String
+  brandId   String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  brand     Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, brandId]) // the same person can't be assigned to the same brand twice
+  @@index([brandId])
 }

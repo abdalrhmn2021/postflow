@@ -1,22 +1,9 @@
-import { Test } from "@nestjs/testing";
 import type { INestApplication } from "@nestjs/common";
 import request from "supertest";
 import type { App } from "supertest/types.js";
-import { AppModule } from "../src/app.module.js";
 import { RedisService } from "../src/redis/redis.service.js";
 import { HEARTBEAT_KEY } from "../src/worker/heartbeat.js";
-
-// Runs against a real PostgreSQL and Redis (docker compose locally, services in CI),
-// with DATABASE_URL and REDIS_URL from the environment or apps/api/.env.
-async function startApp(override?: (b: ReturnType<typeof Test.createTestingModule>) => void) {
-  const builder = Test.createTestingModule({ imports: [AppModule] });
-  override?.(builder);
-  const moduleRef = await builder.compile();
-  const app = moduleRef.createNestApplication();
-  app.setGlobalPrefix("api");
-  await app.init();
-  return app as INestApplication<App>;
-}
+import { startApp } from "./app.js";
 
 describe("GET /api/health", () => {
   let app: INestApplication<App>;
