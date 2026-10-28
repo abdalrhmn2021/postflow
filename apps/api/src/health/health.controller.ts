@@ -1,4 +1,4 @@
-import { Controller, Get, ServiceUnavailableException } from "@nestjs/common";
+import { Controller, Get, Logger, ServiceUnavailableException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { RedisService } from "../redis/redis.service.js";
 import { HEARTBEAT_KEY } from "../worker/heartbeat.js";
@@ -8,16 +8,27 @@ type Check = "up" | "down";
 // 5 s, not less: a cloud database that sleeps when idle (Neon free plan) needs a moment to wake up.
 const CHECK_TIMEOUT_MS = 5000;
 
+const logger = new Logger("HealthCheck");
+// Last failure message per check, so a check that keeps failing is logged once, not every 10 s.
+const lastError = new Map<string, string>();
+
 // Resolves 'up' if the check finishes in time, 'down' if it throws or takes too long.
-async function probe(check: () => Promise<unknown>): Promise<Check> {
+// The reason for a 'down' goes to the API's terminal (never to the browser: it can contain hostnames).
+async function probe(name: string, check: () => Promise<unknown>): Promise<Check> {
   let timer: NodeJS.Timeout | undefined;
   const timeout = new Promise<never>((_, reject) => {
     timer = setTimeout(() => reject(new Error("timeout")), CHECK_TIMEOUT_MS);
   });
   try {
     await Promise.race([check(), timeout]);
+    if (lastError.delete(name)) logger.log(`${name} is back up`);
     return "up";
-  } catch {
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (lastError.get(name) !== message) {
+      lastError.set(name, message);
+      logger.warn(`${name} check failed: ${message}`);
+    }
     return "down";
   } finally {
     clearTimeout(timer);
@@ -37,8 +48,8 @@ export class HealthController {
   @Get()
   async check() {
     const [database, redis] = await Promise.all([
-      probe(() => this.prisma.$queryRaw`SELECT 1`),
-      probe(() => this.redis.client.ping()),
+      probe("database", () => this.prisma.$queryRaw`SELECT 1`),
+      probe("redis", () => this.redis.client.ping()),
     ]);
     const lastBeat = redis === "up" ? await this.redis.client.get(HEARTBEAT_KEY).catch(() => null) : null;
 

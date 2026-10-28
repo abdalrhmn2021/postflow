@@ -70,7 +70,7 @@ The home page shows a live status of the API, database, Redis and worker.
 Skip `npm run db:up` and use two free hosted services instead - nothing to install:
 
 1. **PostgreSQL - [Neon](https://neon.com):** create a project, copy its connection string
-   (`postgresql://...neon.tech/neondb?sslmode=require`) into `DATABASE_URL` in `apps/api/.env`.
+   (`postgresql://...neon.tech/neondb?sslmode=verify-full`) into `DATABASE_URL` in `apps/api/.env`.
 2. **Redis - [Upstash](https://upstash.com):** create a Redis database, copy its `rediss://...` URL into `REDIS_URL`.
 
 Neon's free database sleeps after 5 idle minutes; the first request after that takes a moment longer.
