@@ -2,7 +2,7 @@
 
 **Social media scheduling for agencies.** An agency plans its clients' posts on one calendar, the client approves them from a link, and each post goes out on Facebook and Instagram at its time - automatically. Captions are drafted by AI in the brand's own voice.
 
-> Status: **phase 1 (accounts and agencies)** - in progress. Done: database tables, agency sign-up, login (cookie), route protection and roles, brands (clients) with editor assignment, staff invites (link).
+> Status: **phase 1 (accounts and agencies)** - in progress. Done: database tables, agency sign-up, login (cookie), route protection and roles, brands (clients) with editor assignment, staff invites (link), staff list / role change / removal.
 
 ## Tech stack
 
@@ -42,6 +42,7 @@ postflow/
 │       │   ├── auth/        sign-up, login, /me, logout; AuthGuard + @Public / @Roles / @CurrentUser
 │       │   ├── brands/      an agency's clients: /api/brands, editors per brand
 │       │   ├── invites/     staff invites: the owner makes a link, the person opens it and makes an account
+│       │   ├── staff/       the agency's people: /api/staff, change a role, remove someone
 │       │   ├── common/      shared pieces (request validation)
 │       │   ├── worker/      worker module + heartbeat
 │       │   ├── main.ts      API entry point
