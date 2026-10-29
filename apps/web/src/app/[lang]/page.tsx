@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Logo } from "@/components/Logo";
 import { ButtonLink } from "@/components/ui/Button";
 import { LanguageSwitch } from "@/components/ui/LanguageSwitch";
 import { getDictionary, getLocale } from "@/i18n/get-dictionary";
@@ -11,9 +12,7 @@ export default async function Home() {
   return (
     <div className="flex flex-1 flex-col">
       <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-4 py-5">
-        <span className="text-lg font-bold">
-          Post<span className="text-accent">Flow</span>
-        </span>
+        <Logo locale={locale} />
         <LanguageSwitch current={locale} label={dict.common.switchLanguage} />
       </header>
 
