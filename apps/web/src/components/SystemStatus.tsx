@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { Dictionary } from "@/i18n/dictionaries/ar";
 
 interface Health {
   status: "ok" | "error";
@@ -10,14 +11,9 @@ interface Health {
 
 type State = { kind: "loading" } | { kind: "unreachable" } | { kind: "done"; health: Health };
 
-const ROWS = [
-  { key: "api", label: "الـ API" },
-  { key: "database", label: "قاعدة البيانات (PostgreSQL)" },
-  { key: "redis", label: "Redis" },
-  { key: "worker", label: "الـ Worker" },
-] as const;
+const ROWS = ["api", "database", "redis", "worker"] as const;
 
-function isUp(state: State, key: (typeof ROWS)[number]["key"]): boolean | null {
+function isUp(state: State, key: (typeof ROWS)[number]): boolean | null {
   if (state.kind === "loading") return null;
   if (state.kind === "unreachable") return false;
   if (key === "api") return true;
@@ -27,7 +23,7 @@ function isUp(state: State, key: (typeof ROWS)[number]["key"]): boolean | null {
 
 // Phase 0 check: does the browser -> Next.js -> API -> database / Redis chain work?
 // /api/health goes through the rewrite in next.config.ts, so this also proves the proxy.
-export default function SystemStatus() {
+export default function SystemStatus({ t }: { t: Dictionary["status"] }) {
   const [state, setState] = useState<State>({ kind: "loading" });
 
   useEffect(() => {
@@ -51,13 +47,13 @@ export default function SystemStatus() {
 
   return (
     <section className="w-full rounded-2xl border border-line bg-card p-6">
-      <h2 className="text-lg font-semibold">حالة النظام</h2>
+      <h1 className="text-lg font-semibold">{t.title}</h1>
       <ul className="mt-4 divide-y divide-line">
-        {ROWS.map((row) => {
-          const up = isUp(state, row.key);
+        {ROWS.map((key) => {
+          const up = isUp(state, key);
           return (
-            <li key={row.key} className="flex items-center justify-between py-3">
-              <span>{row.label}</span>
+            <li key={key} className="flex items-center justify-between py-3">
+              <span>{t[key]}</span>
               <span
                 className={`flex items-center gap-2 text-sm ${up === null ? "text-muted" : up ? "text-good" : "text-bad"}`}
               >
@@ -65,7 +61,7 @@ export default function SystemStatus() {
                   aria-hidden
                   className={`size-2.5 rounded-full ${up === null ? "bg-muted" : up ? "bg-good" : "bg-bad"}`}
                 />
-                {up === null ? "جاري الفحص…" : up ? "شغّال" : "واقف"}
+                {up === null ? t.checking : up ? t.up : t.down}
               </span>
             </li>
           );
@@ -73,8 +69,7 @@ export default function SystemStatus() {
       </ul>
       {state.kind === "unreachable" && (
         <p className="mt-4 text-sm text-muted">
-          الـ API مش واصل. شغّل <code dir="ltr">npm run dev:api</code> وتأكد إنه Docker شغّال (
-          <code dir="ltr">npm run db:up</code>).
+          {t.unreachable} <code dir="ltr">npm run dev:api</code>
         </p>
       )}
     </section>

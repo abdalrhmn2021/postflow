@@ -2,7 +2,7 @@
 
 **Social media scheduling for agencies.** An agency plans its clients' posts on one calendar, the client approves them from a link, and each post goes out on Facebook and Instagram at its time - automatically. Captions are drafted by AI in the brand's own voice.
 
-> Status: **phase 1 (accounts and agencies)** - in progress. Done: database tables, agency sign-up, login (cookie), route protection and roles, brands (clients) with editor assignment, staff invites (link), staff list / role change / removal.
+> Status: **phase 1 (accounts and agencies)** - in progress. Done: database tables, agency sign-up, login (cookie), route protection and roles, brands (clients) with editor assignment, staff invites (link), staff list / role change / removal (API complete). Website: Arabic / English (language in the URL: /ar, /en), font, colors, base components.
 
 ## Tech stack
 
@@ -31,7 +31,12 @@ The API and the **worker** are the same codebase but two processes: the API answ
 postflow/
 ├── apps/
 │   ├── web/                 Next.js site
-│   │   └── src/app/         pages
+│   │   └── src/
+│   │       ├── app/[lang]/  pages, under /ar or /en
+│   │       ├── i18n/        languages: dictionaries (ar.ts, en.ts), config
+│   │       ├── lib/         api() - the one way to call the API; error texts
+│   │       ├── components/  ui/ (Button, Input, FormError, LanguageSwitch), SystemStatus
+│   │       └── proxy.ts     sends a URL without a language to /ar or /en
 │   └── api/                 NestJS API + worker
 │       ├── prisma/          schema.prisma, migrations
 │       ├── src/

@@ -1,0 +1,63 @@
+import type { Dictionary } from "./ar";
+
+// Same keys as ar.ts - a missing or extra key is a TypeScript error.
+export const en: Dictionary = {
+  meta: {
+    description: "Schedule your clients' Facebook and Instagram posts, with client approval and AI captions.",
+  },
+  common: {
+    languageName: "English",
+    switchLanguage: "العربية",
+    loading: "Loading…",
+  },
+  home: {
+    tagline: "Social media scheduling for agencies",
+    title: "Plan all your clients' posts on one calendar",
+    description:
+      "The client approves each post from a link, and it goes out on Facebook and Instagram at its time, automatically. Captions are drafted by AI in each brand's own voice.",
+    register: "Sign up your agency",
+    login: "Log in",
+    status: "System status",
+  },
+  status: {
+    title: "System status",
+    api: "API",
+    database: "Database (PostgreSQL)",
+    redis: "Redis",
+    worker: "Worker",
+    checking: "Checking…",
+    up: "Up",
+    down: "Down",
+    unreachable: "Can't reach the API. Start it with:",
+  },
+  errors: {
+    VALIDATION_ERROR: "Some fields are missing or invalid. Fix them and try again.",
+    EMAIL_TAKEN: "This email already has an account.",
+    SLUG_TAKEN: "This link name is taken. Choose another one.",
+    INVALID_CREDENTIALS: "Wrong email or password.",
+    TOO_MANY_ATTEMPTS: "Too many login attempts. Wait a minute and try again.",
+    UNAUTHENTICATED: "Please log in.",
+    FORBIDDEN: "Your role can't do this.",
+    BRAND_NOT_FOUND: "Brand not found.",
+    BRAND_NAME_TAKEN: "You already have a brand with this name.",
+    INVALID_EDITORS: "Everyone must be an editor in your agency.",
+    INVITE_INVALID: "This invite link is wrong, used or expired.",
+    INVITE_NOT_FOUND: "Invite not found.",
+    STAFF_NOT_FOUND: "Staff member not found.",
+    CANNOT_CHANGE_OWNER: "The agency owner can't be changed or removed.",
+    NETWORK_ERROR: "Couldn't reach the server. Check your connection and try again.",
+    UNKNOWN: "Something went wrong. Please try again.",
+  },
+  fields: {
+    required: "Required",
+    atLeast: "At least {n} characters",
+    atMost: "At most {n} characters",
+    invalidEmail: "Invalid email address",
+    slugChars: "Only lower-case English letters, numbers and dashes (-)",
+    language: "Must be Arabic or English",
+    timezone: "Unknown time zone",
+    nothingToChange: "Nothing to change",
+    role: "Must be manager or editor",
+    invalid: "Invalid value",
+  },
+};
