@@ -7,7 +7,7 @@ import { LogoutButton } from "./LogoutButton";
 import { NavBar, NavLinks } from "./NavLinks";
 
 // Every dashboard page: a top bar (logo, agency, who's logged in, language, log out), the sections
-// (home, clients) and the page below.
+// (home, clients, team) and the page below.
 // proxy.ts already sent visitors without a login cookie to /login; getSession() checks the cookie is valid.
 // The bar's static part shows at once; the part that needs the login streams in (Suspense).
 export default async function DashboardLayout({ children }: LayoutProps<"/[lang]/dashboard">) {
@@ -24,17 +24,28 @@ export default async function DashboardLayout({ children }: LayoutProps<"/[lang]
           <Suspense fallback={<div className="flex-1" />}>
             <UserBar />
           </Suspense>
-          {/* These two read the URL (usePathname), which pages like /brands/<id> only know when opened. */}
-          <Suspense fallback={<span className="px-3 py-1.5 text-sm text-muted">{dict.common.switchLanguage}</span>}>
-            <LanguageSwitch current={locale} label={dict.common.switchLanguage} />
-          </Suspense>
+          <LanguageSwitch current={locale} label={dict.common.switchLanguage} />
         </div>
         <Suspense fallback={<NavBar links={links} />}>
-          <NavLinks links={links} />
+          <Sections links={links} team={{ href: `/${locale}/dashboard/team`, label: dict.dashboard.nav.team }} />
         </Suspense>
       </header>
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
     </div>
+  );
+}
+
+type Link = { href: string; label: string; exact?: boolean };
+
+// The section links, plus "Team" for the owner and managers (the API doesn't show editors the team).
+// NavLinks reads the URL to highlight the current section, which some pages only know when opened.
+async function Sections({ links, team }: { links: Link[]; team: Link }) {
+  const { user } = await getSession();
+  const all = user.role === "EDITOR" ? links : [...links, team];
+  return (
+    <Suspense fallback={<NavBar links={all} />}>
+      <NavLinks links={all} />
+    </Suspense>
   );
 }
 

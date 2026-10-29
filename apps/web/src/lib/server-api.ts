@@ -17,6 +17,14 @@ const API_URL = (process.env.API_URL ?? "http://localhost:4000").replace(/\/$/, 
 //
 // Reads the request, so it must be called inside a <Suspense> boundary (Cache Components).
 export async function serverApi<T>(path: string): Promise<T> {
+  const data = await serverApiOrNull<T>(path);
+  if (data === null) notFound();
+  return data;
+}
+
+// The same, but a 404 is null instead of the not-found page - for a page that says it in its own words
+// (an invite link that doesn't work).
+export async function serverApiOrNull<T>(path: string): Promise<T | null> {
   const [locale, cookie] = await Promise.all([getLocale(), headers().then((h) => h.get("cookie"))]);
 
   const res = await fetch(`${API_URL}/api${path}`, {
@@ -25,7 +33,7 @@ export async function serverApi<T>(path: string): Promise<T> {
   });
 
   if (res.status === 401) redirect(`/${locale}/login`);
-  if (res.status === 404) notFound();
+  if (res.status === 404) return null;
   if (!res.ok) throw new Error(`GET /api${path} answered ${res.status}`);
   return (await res.json()) as T;
 }

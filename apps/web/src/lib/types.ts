@@ -28,3 +28,22 @@ export type StaffMember = {
   createdAt: string;
   brands: { id: string; name: string }[];
 };
+
+// GET /invites (owner): open invites. POST /invites answers the same plus the link, once.
+export type Invite = {
+  id: string;
+  email: string;
+  role: Exclude<Role, "OWNER">;
+  expiresAt: string;
+  createdAt: string;
+  invitedBy: { id: string; name: string } | null;
+};
+
+export type CreatedInvite = Invite & { link: string };
+
+// GET /invites/accept/:token (public): what the invite page shows before the form.
+export type InvitePreview = {
+  email: string;
+  role: Exclude<Role, "OWNER">;
+  agency: { name: string; slug: string };
+};

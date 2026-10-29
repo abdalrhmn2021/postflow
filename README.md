@@ -2,7 +2,7 @@
 
 **Social media scheduling for agencies.** An agency plans its clients' posts on one calendar, the client approves them from a link, and each post goes out on Facebook and Instagram at its time - automatically. Captions are drafted by AI in the brand's own voice.
 
-> Status: **phase 1 (accounts and agencies)** - in progress. Done: database tables, agency sign-up, login (cookie), route protection and roles, brands (clients) with editor assignment, staff invites (link), staff list / role change / removal (API complete). Website: Arabic / English (language in the URL: /ar, /en), font, colors, base components, agency sign-up and login pages, a protected dashboard (top bar, sections, log out), clients pages (list, add, edit, editors, delete; read-only for managers and editors).
+> Status: **phase 1 (accounts and agencies)** - done (API and website). Done: database tables, agency sign-up, login (cookie), route protection and roles, brands (clients) with editor assignment, staff invites (link), staff list / role change / removal (API complete). Website: Arabic / English (language in the URL: /ar, /en), font, colors, base components, agency sign-up and login pages, a protected dashboard (top bar, sections, log out), clients pages (list, add, edit, editors, delete; read-only for managers and editors), team page (invite by link - copy or WhatsApp, open invites, role change, removal) and the invite page where a new staff member makes their account.
 
 ## Tech stack
 
@@ -35,7 +35,7 @@ postflow/
 │   │       ├── app/[lang]/  pages, under /ar or /en
 │   │       ├── i18n/        languages: dictionaries (ar.ts, en.ts), config
 │   │       ├── lib/         api() - the one way to call the API; error texts; serverApi() / getSession() (server); time zones
-│   │       ├── components/  ui/ (Button, Input, Select, Textarea, FormError, LanguageSwitch), Logo, SystemStatus
+│   │       ├── components/  ui/ (Button, Input, Select, Textarea, FormError, LanguageSwitch), Logo, LocalDate, SystemStatus
 │   │       └── proxy.ts     sends a URL without a language to /ar or /en; /dashboard needs a login
 │   └── api/                 NestJS API + worker
 │       ├── prisma/          schema.prisma, migrations
