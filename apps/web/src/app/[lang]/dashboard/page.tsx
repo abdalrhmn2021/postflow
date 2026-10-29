@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { getDictionary } from "@/i18n/get-dictionary";
-import { getSession } from "@/lib/session";
+import { getSession } from "@/lib/server-api";
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getDictionary()).dashboard.title };
