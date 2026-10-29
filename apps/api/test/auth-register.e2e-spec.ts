@@ -2,11 +2,11 @@ import type { INestApplication } from "@nestjs/common";
 import request from "supertest";
 import type { App } from "supertest/types.js";
 import { PrismaService } from "../src/prisma/prisma.service.js";
-import { startApp } from "./app.js";
+import { startApp, uniqueRun } from "./app.js";
 
 // Every agency made here has a slug starting with this, so afterAll removes exactly these
 // (and, through onDelete: Cascade, their users) - even when the tests run against a dev database.
-const RUN = `e2e-${Date.now().toString(36)}`;
+const RUN = uniqueRun();
 
 function signUp(app: INestApplication<App>, change: Record<string, unknown> = {}) {
   return request(app.getHttpServer())

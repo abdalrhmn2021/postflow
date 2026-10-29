@@ -4,9 +4,9 @@ import type { App } from "supertest/types.js";
 import { LOGIN_ATTEMPTS } from "../src/auth/login-limit.service.js";
 import { PrismaService } from "../src/prisma/prisma.service.js";
 import { RedisService } from "../src/redis/redis.service.js";
-import { startApp } from "./app.js";
+import { startApp, uniqueRun } from "./app.js";
 
-const RUN = `e2e-${Date.now().toString(36)}`;
+const RUN = uniqueRun();
 const EMAIL = `owner@${RUN}.test`;
 const PASSWORD = "a-long-password";
 
