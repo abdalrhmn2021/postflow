@@ -1,5 +1,6 @@
 // PostFlow database schema.
-// Change a model -> `npm run db:migrate -w api` (creates a migration and regenerates the client).
+// Change a model -> `npm run db:migrate -w api -- --name <what-changed>`: creates and applies a migration,
+// then postdb:migrate regenerates the client (Prisma 7's migrate dev no longer does that itself).
 
 generator client {
   provider            = "prisma-client"
@@ -33,8 +34,9 @@ model Agency {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users  User[]
-  brands Brand[]
+  users   User[]
+  brands  Brand[]
+  invites Invite[]
 }
 
 model User {
@@ -49,7 +51,8 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  brands BrandMember[]
+  brands      BrandMember[]
+  invitesSent Invite[]
 
   @@index([agencyId])
 }
@@ -83,4 +86,24 @@ model BrandMember {
 
   @@id([userId, brandId]) // the same person can't be assigned to the same brand twice
   @@index([brandId])
+}
+
+// A staff invite: the owner makes one, sends the link himself (WhatsApp, Messenger...),
+// and the person opens it to make their account. Deleted once accepted, so a link works once.
+model Invite {
+  id          String   @id @default(uuid())
+  email       String // stored lower-case, like User.email
+  role        Role // MANAGER or EDITOR - an agency has one owner, never invited
+  // SHA-256 of the secret in the link, never the secret itself: someone who reads the database
+  // can't use the invites in it (the same idea as passwordHash).
+  tokenHash   String   @unique
+  expiresAt   DateTime
+  agencyId    String
+  agency      Agency   @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  invitedById String?
+  invitedBy   User?    @relation(fields: [invitedById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+
+  // One open invite per email in an agency: inviting the same email again replaces the old link.
+  @@unique([agencyId, email])
 }

@@ -15,5 +15,6 @@ import { SessionService } from "./session.service.js";
     // AuthGuard on every route of every module - routes opt out with @Public().
     { provide: APP_GUARD, useClass: AuthGuard },
   ],
+  exports: [AuthService, SessionService], // invites: read the new user and log them in
 })
 export class AuthModule {}
