@@ -7,9 +7,10 @@ import { ButtonLink } from "@/components/ui/Button";
 import type { Locale } from "@/i18n/config";
 import type { Dictionary } from "@/i18n/dictionaries/ar";
 import { getDictionary, getLocale } from "@/i18n/get-dictionary";
-import { serverApi } from "@/lib/server-api";
+import { getSession, serverApi } from "@/lib/server-api";
 import type { Brand, Post } from "@/lib/types";
 import { formatInZone } from "@/lib/zoned-time";
+import { NoBrands } from "./NoBrands";
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getDictionary()).posts.title };
@@ -49,7 +50,8 @@ async function PostLists({ locale, t }: { locale: Locale; t: Dictionary["posts"]
   const to = new Date(from.getTime() + DAYS_AHEAD * 24 * 60 * 60 * 1000);
   const range = new URLSearchParams({ from: from.toISOString(), to: to.toISOString() });
 
-  const [brands, upcoming, unscheduled] = await Promise.all([
+  const [{ user }, brands, upcoming, unscheduled] = await Promise.all([
+    getSession(),
     serverApi<Brand[]>("/brands"),
     serverApi<Post[]>(`/posts?${range}`),
     serverApi<Post[]>("/posts/unscheduled"),
@@ -59,9 +61,7 @@ async function PostLists({ locale, t }: { locale: Locale; t: Dictionary["posts"]
     return (
       <>
         <Header title={t.title} subtitle={t.subtitle} />
-        <p className="rounded-2xl border border-dashed border-line bg-card px-6 py-12 text-center text-muted">
-          {t.noBrands}
-        </p>
+        <NoBrands role={user.role} locale={locale} t={t} />
       </>
     );
   }

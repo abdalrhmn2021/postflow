@@ -96,6 +96,8 @@ export const en: Dictionary = {
     unscheduledEmpty: "No drafts without a time.",
     noBrands:
       "You have no clients yet, so you can't write posts. The agency owner adds clients and assigns you to them.",
+    noBrandsOwner: "You have no clients yet. Add your first client, then you can write and schedule its posts.",
+    addBrand: "Add a client",
     noCaption: "(no text)",
     by: "by {name}",
     back: "All posts",

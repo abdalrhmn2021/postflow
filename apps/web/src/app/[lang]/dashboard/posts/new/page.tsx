@@ -6,6 +6,7 @@ import type { Dictionary } from "@/i18n/dictionaries/ar";
 import { getDictionary, getLocale } from "@/i18n/get-dictionary";
 import { getSession } from "@/lib/server-api";
 import { brandOptions } from "../brand-options";
+import { NoBrands } from "../NoBrands";
 import { PostEditor } from "../PostEditor";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -35,11 +36,7 @@ const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 async function NewPost({ locale, dict, searchParams }: { locale: Locale; dict: Dictionary; searchParams: Search }) {
   const [{ user }, brands, search] = await Promise.all([getSession(), brandOptions(locale), searchParams]);
   if (brands.length === 0) {
-    return (
-      <p className="rounded-2xl border border-dashed border-line bg-card px-6 py-12 text-center text-muted">
-        {dict.posts.noBrands}
-      </p>
-    );
+    return <NoBrands role={user.role} locale={locale} t={dict.posts} />;
   }
   const brand = one(search.brand);
   const at = one(search.at);
