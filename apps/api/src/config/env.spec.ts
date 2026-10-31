@@ -33,6 +33,8 @@ describe("validateEnv", () => {
     expect(validateEnv(base).JWT_SECRET.length).toBeGreaterThanOrEqual(32);
     expect(() => validateEnv({ ...base, NODE_ENV: "production" })).toThrow(/JWT_SECRET/);
     expect(() => validateEnv({ ...base, JWT_SECRET: "too-short" })).toThrow(/32 characters/);
+    expect(validateEnv({ ...base, JWT_SECRET: "" }).JWT_SECRET.length).toBeGreaterThanOrEqual(32); // as in .env.example
+    expect(() => validateEnv({ ...base, JWT_SECRET: "", NODE_ENV: "production" })).toThrow(/required in production/);
   });
 
   it("reads TRUST_PROXY as a hop count when it is a number", () => {

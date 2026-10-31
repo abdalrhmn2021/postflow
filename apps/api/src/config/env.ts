@@ -25,7 +25,11 @@ const envSchema = z.object({
   // Signs the login tokens. Anyone who knows it can log in as anyone, so: long, random, secret.
   // Make one with:  node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
   // Optional in development and tests (a fixed dev value is used); required in production - see below.
-  JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters").optional(),
+  // An empty value (JWT_SECRET= as in .env.example) counts as not set.
+  JWT_SECRET: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.string().min(32, "JWT_SECRET must be at least 32 characters").optional(),
+  ),
 
   // Which proxies in front of the API to trust for the visitor's real IP (X-Forwarded-For), used to
   // limit login attempts per visitor. "loopback": the Next.js site on the same machine (development).
