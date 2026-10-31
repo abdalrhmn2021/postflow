@@ -2,7 +2,9 @@
 
 **Social media scheduling for agencies.** An agency plans its clients' posts on one calendar, the client approves them from a link, and each post goes out on Facebook and Instagram at its time - automatically. Captions are drafted by AI in the brand's own voice.
 
-> Status: **phase 1 (accounts and agencies)** - done (API and website). Done: database tables, agency sign-up, login (cookie), route protection and roles, brands (clients) with editor assignment, staff invites (link), staff list / role change / removal (API complete). Website: Arabic / English (language in the URL: /ar, /en), font, colors, base components, agency sign-up and login pages, a protected dashboard (top bar, sections, log out), clients pages (list, add, edit, editors, delete; read-only for managers and editors), team page (invite by link - copy or WhatsApp, open invites, role change, removal) and the invite page where a new staff member makes their account.
+> Status: **phase 2 (posts)** - in progress. Done: the posts table (draft -> scheduled -> published / failed), the posts API (calendar range, drafts with no time, create, edit, schedule, unschedule, delete; editors draft for their brands, the owner and managers schedule; Instagram's caption and hashtag limits checked before scheduling).
+>
+> **Phase 1 (accounts and agencies)** - done (API and website). Done: database tables, agency sign-up, login (cookie), route protection and roles, brands (clients) with editor assignment, staff invites (link), staff list / role change / removal (API complete). Website: Arabic / English (language in the URL: /ar, /en), font, colors, base components, agency sign-up and login pages, a protected dashboard (top bar, sections, log out), clients pages (list, add, edit, editors, delete; read-only for managers and editors), team page (invite by link - copy or WhatsApp, open invites, role change, removal) and the invite page where a new staff member makes their account.
 
 ## Tech stack
 
@@ -48,6 +50,7 @@ postflow/
 │       │   ├── brands/      an agency's clients: /api/brands, editors per brand
 │       │   ├── invites/     staff invites: the owner makes a link, the person opens it and makes an account
 │       │   ├── staff/       the agency's people: /api/staff, change a role, remove someone
+│       │   ├── posts/       /api/posts: the calendar, drafts, scheduling; posts.rules.ts = what a post needs before it's scheduled
 │       │   ├── common/      shared pieces (request validation)
 │       │   ├── worker/      worker module + heartbeat
 │       │   ├── main.ts      API entry point
