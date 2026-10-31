@@ -53,6 +53,7 @@ model User {
 
   brands      BrandMember[]
   invitesSent Invite[]
+  posts       Post[]
 
   @@index([agencyId])
 }
@@ -70,6 +71,7 @@ model Brand {
   updatedAt DateTime @updatedAt
 
   members BrandMember[]
+  posts   Post[]
 
   // Two brands with the same name in one agency: no. The same name in two agencies: fine.
   @@unique([agencyId, name])
@@ -106,4 +108,43 @@ model Invite {
 
   // One open invite per email in an agency: inviting the same email again replaces the old link.
   @@unique([agencyId, email])
+}
+
+// Where a post goes out. One post can go to both (the same caption and time).
+enum Platform {
+  FACEBOOK
+  INSTAGRAM
+}
+
+// A post's life:  DRAFT -> SCHEDULED -> PUBLISHED, or FAILED if Meta says no (phase 4).
+// Phase 5 adds the client's approval between DRAFT and SCHEDULED.
+enum PostStatus {
+  DRAFT // being written; anyone on the brand can edit it
+  SCHEDULED // has a time and waits for the worker; only an owner or a manager schedules
+  PUBLISHED // out on the platforms - kept as history, no longer edited
+  FAILED // the worker couldn't publish it; can be fixed and scheduled again
+}
+
+// One post of one brand. No agencyId of its own: the brand already has it, and every query
+// goes through visibleBrands() - the same isolation rule as the brands themselves.
+model Post {
+  id          String     @id @default(uuid())
+  caption     String     @default("") // the text, hashtags included; a draft may start empty
+  platforms   Platform[] @default([]) // empty for a draft that hasn't picked yet; a scheduled post needs at least one
+  status      PostStatus @default(DRAFT)
+  // When to publish, in UTC. The calendar shows it in the brand's time zone (Brand.timezone).
+  // A draft may have no time yet; a scheduled post must have one (a CHECK in the migration says so too).
+  scheduledAt DateTime?
+  publishedAt DateTime? // set by the worker when it goes out (phase 4)
+  brandId     String
+  brand       Brand      @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  // Who wrote it. Removing a staff member keeps their posts (the brand's history), just unsigned.
+  createdById String?
+  createdBy   User?      @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([brandId, scheduledAt]) // the calendar: one brand's posts between two dates
+  @@index([status, scheduledAt]) // the worker (phase 4): scheduled posts whose time has come
+  @@index([createdById])
 }
