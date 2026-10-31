@@ -7,7 +7,7 @@ import { LogoutButton } from "./LogoutButton";
 import { NavBar, NavLinks } from "./NavLinks";
 
 // Every dashboard page: a top bar (logo, agency, who's logged in, language, log out), the sections
-// (home, clients, team) and the page below.
+// (home, clients, posts, team) and the page below.
 // proxy.ts already sent visitors without a login cookie to /login; getSession() checks the cookie is valid.
 // The bar's static part shows at once; the part that needs the login streams in (Suspense).
 export default async function DashboardLayout({ children }: LayoutProps<"/[lang]/dashboard">) {
@@ -15,6 +15,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/[lang]
   const links = [
     { href: `/${locale}/dashboard`, label: dict.dashboard.nav.home, exact: true },
     { href: `/${locale}/dashboard/brands`, label: dict.dashboard.nav.brands },
+    { href: `/${locale}/dashboard/posts`, label: dict.dashboard.nav.posts },
   ];
   return (
     <div className="flex flex-1 flex-col">

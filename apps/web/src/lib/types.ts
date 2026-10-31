@@ -47,3 +47,22 @@ export type InvitePreview = {
   role: Exclude<Role, "OWNER">;
   agency: { name: string; slug: string };
 };
+
+export type Platform = "FACEBOOK" | "INSTAGRAM";
+// DRAFT -> SCHEDULED -> PUBLISHED, or FAILED when the worker couldn't publish it (phase 4).
+export type PostStatus = "DRAFT" | "SCHEDULED" | "PUBLISHED" | "FAILED";
+
+// GET /posts (the calendar range), /posts/unscheduled, /posts/:id. Times are UTC ISO strings;
+// show them in brand.timezone (lib/zoned-time.ts), not in the visitor's zone.
+export type Post = {
+  id: string;
+  caption: string;
+  platforms: Platform[];
+  status: PostStatus;
+  scheduledAt: string | null; // a draft may have no time yet
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  brand: { id: string; name: string; timezone: string };
+  createdBy: { id: string; name: string } | null; // null once that staff member was removed
+};

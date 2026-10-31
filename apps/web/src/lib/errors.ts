@@ -22,6 +22,14 @@ const PATTERNS: [RegExp, keyof Dictionary["fields"]][] = [
   [/^Unknown time zone$/, "timezone"],
   [/^Nothing to change$/, "nothingToChange"],
   [/^Must be MANAGER or EDITOR$/, "role"],
+  [/^Write the post first$/, "writeFirst"],
+  [/^Pick at least one platform$/, "pickPlatform"],
+  [/^Pick a time$/, "pickTime"],
+  [/^The time has already passed$/, "timePassed"],
+  [/^Instagram allows at most (\d+) characters$/, "instagramChars"],
+  [/^Instagram allows at most (\d+) hashtags$/, "instagramHashtags"],
+  [/^Must be a date and time$/, "dateTime"],
+  [/^Must be FACEBOOK or INSTAGRAM$/, "platform"],
 ];
 
 export function fieldText(apiMessage: string | undefined, fields: Dictionary["fields"]): string | undefined {
