@@ -13,12 +13,12 @@ export async function generateMetadata(): Promise<Metadata> {
 
 // The agency's clients. The API decides who sees which: the owner and managers every client,
 // an editor only the ones they're on. Only the owner adds clients.
-export default async function BrandsPage() {
+export default async function BrandsPage({ searchParams }: PageProps<"/[lang]/dashboard/brands">) {
   const t = (await getDictionary()).brands;
   return (
     <div className="flex flex-col gap-6">
       <Suspense fallback={<Header title={t.title} subtitle={t.subtitle} />}>
-        <BrandList />
+        <BrandList searchParams={searchParams} />
       </Suspense>
     </div>
   );
@@ -36,12 +36,13 @@ function Header({ title, subtitle, action }: { title: string; subtitle: string; 
   );
 }
 
-async function BrandList() {
-  const [locale, dict, { user }, brands] = await Promise.all([
+async function BrandList({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const [locale, dict, { user }, brands, query] = await Promise.all([
     getLocale(),
     getDictionary(),
     getSession(),
     serverApi<Brand[]>("/brands"),
+    searchParams,
   ]);
   const t = dict.brands;
   const isOwner = user.role === "OWNER";
@@ -53,6 +54,13 @@ async function BrandList() {
         subtitle={t.subtitle}
         action={isOwner && <ButtonLink href={`/${locale}/dashboard/brands/new`}>{t.add}</ButtonLink>}
       />
+
+      {/* Facebook's login came back after its 10 minutes, or for someone else: we don't know which client. */}
+      {query.meta_error && (
+        <p role="alert" className="rounded-xl border border-bad/30 bg-bad/10 px-4 py-3 text-sm text-bad">
+          {dict.accounts.errorExpired}
+        </p>
+      )}
 
       {brands.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-line bg-card px-6 py-12 text-center text-muted">
@@ -68,6 +76,15 @@ async function BrandList() {
               >
                 <span className="text-lg font-semibold">{brand.name}</span>
                 <span className="flex flex-wrap gap-2 text-xs">
+                  {brand.account && (
+                    <span
+                      className={`rounded-full px-2.5 py-1 font-semibold ${brand.account.status === "OK" ? "bg-good/15 text-good" : "bg-bad/15 text-bad"}`}
+                    >
+                      {brand.account.status === "OK" ? "✓ " : "! "}
+                      {dict.accounts.facebook}
+                      {brand.account.instagramId ? ` + ${dict.accounts.instagram}` : ""}
+                    </span>
+                  )}
                   <span className="rounded-full bg-surface px-2.5 py-1">{t.languages[brand.language]}</span>
                   <span className="rounded-full bg-surface px-2.5 py-1">{timezoneName(brand.timezone, locale)}</span>
                 </span>

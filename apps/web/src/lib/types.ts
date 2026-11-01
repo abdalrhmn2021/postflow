@@ -17,7 +17,42 @@ export type Brand = {
   timezone: string; // IANA, e.g. "Asia/Hebron"
   createdAt: string;
   editors: { id: string; name: string }[];
+  account: SocialAccount | null; // its Facebook page (+ Instagram), once connected
 };
+
+// A client's connected Facebook page and the Instagram linked to it. The token stays on the server.
+export type SocialAccount = {
+  pageId: string;
+  pageName: string;
+  pagePicture: string | null;
+  instagramId: string | null;
+  instagramUsername: string | null;
+  instagramPicture: string | null;
+  status: "OK" | "NEEDS_RECONNECT";
+  checkedAt: string;
+  connectedAt: string;
+};
+
+// GET /brands/:id/meta/pages/:pick - the pages the owner can choose from after logging in to Facebook.
+export type MetaPageChoice = {
+  id: string;
+  name: string;
+  picture: string | null;
+  instagram: { id: string; username: string | null; picture: string | null } | null;
+  takenBy: string | null; // another client of the agency already has this page
+};
+
+// Which platforms a client can be published to. null = Meta isn't set up on the server (not checked).
+export type Connected = { facebook: boolean; instagram: boolean } | null;
+
+export function connectedPlatforms(
+  account: Pick<SocialAccount, "status" | "instagramId"> | null,
+  configured: boolean,
+): Connected {
+  if (!configured) return null;
+  const ok = account?.status === "OK";
+  return { facebook: ok, instagram: ok && Boolean(account?.instagramId) };
+}
 
 // GET /staff (owner and managers). brands: the brands an editor is on.
 export type StaffMember = {
@@ -63,7 +98,12 @@ export type Post = {
   publishedAt: string | null;
   createdAt: string;
   updatedAt: string;
-  brand: { id: string; name: string; timezone: string };
+  brand: {
+    id: string;
+    name: string;
+    timezone: string;
+    account: Pick<SocialAccount, "status" | "instagramId"> | null;
+  };
   createdBy: { id: string; name: string } | null; // null once that staff member was removed
   media: PostMedia[]; // in order: the first is the cover, more than one is a carousel
 };

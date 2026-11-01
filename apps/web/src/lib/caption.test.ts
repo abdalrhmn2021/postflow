@@ -38,6 +38,14 @@ describe("caption", () => {
     ).toEqual({ key: "instagramChars", n: 2200 });
   });
 
+  it("a platform whose account isn't connected: the problem is under platforms", () => {
+    const post = { caption: "x", platforms: ["FACEBOOK" as const], scheduledAt: LATER, media: [] };
+    expect(scheduleProblems({ ...post, connected: null }, NOW)).toEqual({}); // Meta not set up: not checked
+    expect(scheduleProblems({ ...post, connected: { facebook: false, instagram: false } }, NOW)).toEqual({
+      platforms: { key: "facebookNotConnected", n: 0 },
+    });
+  });
+
   it("Instagram with no file: the problem is under media", () => {
     expect(scheduleProblems({ caption: "x", platforms: ["INSTAGRAM"], scheduledAt: LATER, media: [] }, NOW)).toEqual({
       media: { key: "needsMedia", n: 0 },

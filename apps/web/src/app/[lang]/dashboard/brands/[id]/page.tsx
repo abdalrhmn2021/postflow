@@ -8,6 +8,7 @@ import { getSession, serverApi } from "@/lib/server-api";
 import { timezoneName, timezoneOptions } from "@/lib/timezones";
 import type { Brand, StaffMember } from "@/lib/types";
 import { BrandForm } from "../BrandForm";
+import { AccountSection, type ConnectReturn } from "./AccountSection";
 import { DeleteBrand } from "./DeleteBrand";
 import { EditorsForm } from "./EditorsForm";
 
@@ -15,9 +16,10 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getDictionary()).brands.details };
 }
 
-// One client. The owner edits it, picks its editors and can delete it; everyone else only reads.
-// A client of another agency, or one an editor isn't on, is a 404 from the API -> the not-found page.
-export default async function BrandPage({ params }: PageProps<"/[lang]/dashboard/brands/[id]">) {
+// One client. The owner edits it, connects its Facebook page, picks its editors and can delete it;
+// everyone else only reads. A client of another agency, or one an editor isn't on, is a 404 from
+// the API -> the not-found page. Facebook's login comes back here: ?meta=<pick> or ?meta_error=<why>.
+export default async function BrandPage({ params, searchParams }: PageProps<"/[lang]/dashboard/brands/[id]">) {
   const [locale, dict] = await Promise.all([getLocale(), getDictionary()]);
   return (
     <div className="flex max-w-2xl flex-col gap-6">
@@ -25,7 +27,7 @@ export default async function BrandPage({ params }: PageProps<"/[lang]/dashboard
         {dict.brands.back}
       </Link>
       <Suspense fallback={<div className="h-96 animate-pulse rounded-2xl bg-line/50" />}>
-        <BrandDetails params={params} locale={locale} dict={dict} />
+        <BrandDetails params={params} searchParams={searchParams} locale={locale} dict={dict} />
       </Suspense>
     </div>
   );
@@ -33,18 +35,36 @@ export default async function BrandPage({ params }: PageProps<"/[lang]/dashboard
 
 async function BrandDetails({
   params,
+  searchParams,
   locale,
   dict,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
   locale: Locale;
   dict: Dictionary;
 }) {
-  const { id } = await params;
-  const [{ user }, brand] = await Promise.all([getSession(), serverApi<Brand>(`/brands/${encodeURIComponent(id)}`)]);
+  const [{ id }, query] = await Promise.all([params, searchParams]);
+  const [{ user }, brand, meta] = await Promise.all([
+    getSession(),
+    serverApi<Brand>(`/brands/${encodeURIComponent(id)}`),
+    serverApi<{ configured: boolean }>("/meta"),
+  ]);
   const t = dict.brands;
+  const one = (v: string | string[] | undefined) => (typeof v === "string" ? v : undefined);
+  const back: ConnectReturn = { pick: one(query.meta), error: one(query.meta_error), done: query.meta_done === "1" };
+  const accounts = (
+    <AccountSection
+      locale={locale}
+      dict={dict}
+      brand={brand}
+      role={user.role}
+      configured={meta.configured}
+      back={back}
+    />
+  );
 
-  if (user.role !== "OWNER") return <ReadOnly brand={brand} locale={locale} t={t} />;
+  if (user.role !== "OWNER") return <ReadOnly brand={brand} locale={locale} t={t} accounts={accounts} />;
 
   // The owner picks editors from everyone in the agency with the editor role.
   const staff = await serverApi<StaffMember[]>("/staff");
@@ -65,6 +85,8 @@ async function BrandDetails({
         />
       </Section>
 
+      {accounts}
+
       <Section title={t.editorsTitle} hint={t.editorsHint}>
         <EditorsForm
           brandId={brand.id}
@@ -83,7 +105,17 @@ async function BrandDetails({
 }
 
 // What managers and editors see: the same details, as text.
-function ReadOnly({ brand, locale, t }: { brand: Brand; locale: Locale; t: Dictionary["brands"] }) {
+function ReadOnly({
+  brand,
+  locale,
+  t,
+  accounts,
+}: {
+  brand: Brand;
+  locale: Locale;
+  t: Dictionary["brands"];
+  accounts: ReactNode;
+}) {
   const rows: [string, string][] = [
     [t.language, t.languages[brand.language]],
     [t.timezone, timezoneName(brand.timezone, locale)],
@@ -103,6 +135,7 @@ function ReadOnly({ brand, locale, t }: { brand: Brand; locale: Locale; t: Dicti
           ))}
         </dl>
       </Section>
+      {accounts}
     </>
   );
 }

@@ -2,7 +2,9 @@
 
 **Social media scheduling for agencies.** An agency plans its clients' posts on one calendar, the client approves them from a link, and each post goes out on Facebook and Instagram at its time - automatically. Captions are drafted by AI in the brand's own voice.
 
-> Status: **phase 2 (posts)** - in progress. Done: the posts table (draft -> scheduled -> published / failed), the posts API (calendar range, drafts with no time, create, edit, schedule, unschedule, delete; editors draft for their brands, the owner and managers schedule; Instagram's caption and hashtag limits checked before scheduling); website: the posts calendar (month and week, each post on its day in its client's time zone, a client filter, + on a day for a new post, drafts with no time beside it) and the post editor - client, text with Instagram's counters, platforms, a time in the client's own time zone, a live preview, save / schedule / unschedule / delete by role. Images and videos: in the editor, drop or pick files - each uploads with a progress bar, then can be moved or removed; a file Instagram would refuse is marked red; the preview shows the real files (Facebook grid, Instagram carousel) and the calendar a thumbnail. Behind it, the browser uploads straight to Cloudinary with a ticket the API signs for one file name of that client; the API then reads the file's real size and format from Cloudinary and attaches it (up to 10 per post, reorder, remove); Meta's rules checked before scheduling (Instagram needs a file, images 4:5 to 1.91:1, Reels 3 s - 15 min, 60 s in a carousel; Facebook: photos, or one video alone).
+> Status: **phase 3 (Facebook and Instagram)** - code done, waiting for the Meta app. Done: each client connects its Facebook page (and the Instagram professional account linked to it) through Facebook's login - a one-time `state` against forged answers, the person's pages listed to pick from, the page token stored encrypted (AES-256-GCM) and never sent to the browser, `appsecret_proof` on every Graph API call; a page can't be on two clients of one agency; check / reconnect / disconnect; scheduling needs each picked platform connected (once Meta is set up). Website: a "Facebook and Instagram" card on the client's page, the page picker, badges on the clients list, warnings in the post editor.
+>
+> **Phase 2 (posts)** - done. the posts table (draft -> scheduled -> published / failed), the posts API (calendar range, drafts with no time, create, edit, schedule, unschedule, delete; editors draft for their brands, the owner and managers schedule; Instagram's caption and hashtag limits checked before scheduling); website: the posts calendar (month and week, each post on its day in its client's time zone, a client filter, + on a day for a new post, drafts with no time beside it) and the post editor - client, text with Instagram's counters, platforms, a time in the client's own time zone, a live preview, save / schedule / unschedule / delete by role. Images and videos: in the editor, drop or pick files - each uploads with a progress bar, then can be moved or removed; a file Instagram would refuse is marked red; the preview shows the real files (Facebook grid, Instagram carousel) and the calendar a thumbnail. Behind it, the browser uploads straight to Cloudinary with a ticket the API signs for one file name of that client; the API then reads the file's real size and format from Cloudinary and attaches it (up to 10 per post, reorder, remove); Meta's rules checked before scheduling (Instagram needs a file, images 4:5 to 1.91:1, Reels 3 s - 15 min, 60 s in a carousel; Facebook: photos, or one video alone).
 >
 > **Phase 1 (accounts and agencies)** - done (API and website). Done: database tables, agency sign-up, login (cookie), route protection and roles, brands (clients) with editor assignment, staff invites (link), staff list / role change / removal (API complete). Website: Arabic / English (language in the URL: /ar, /en), font, colors, base components, agency sign-up and login pages, a protected dashboard (top bar, sections, log out), clients pages (list, add, edit, editors, delete; read-only for managers and editors), team page (invite by link - copy or WhatsApp, open invites, role change, removal) and the invite page where a new staff member makes their account.
 
@@ -54,6 +56,7 @@ postflow/
 │       │   ├── invites/     staff invites: the owner makes a link, the person opens it and makes an account
 │       │   ├── staff/       the agency's people: /api/staff, change a role, remove someone
 │       │   ├── posts/       /api/posts: the calendar, drafts, scheduling, files; posts.rules.ts = what a post needs before it's scheduled
+│       │   ├── meta/        Facebook login and pages: MetaGraph (what the API needs) and GraphApiMeta; token-cipher.ts
 │       │   ├── media/       file storage: MediaStorage (what the API needs) and CloudinaryStorage (signed uploads, details, delete)
 │       │   ├── common/      shared pieces (request validation)
 │       │   ├── worker/      worker module + heartbeat
@@ -98,6 +101,14 @@ Post files are stored on [Cloudinary](https://cloudinary.com) (free plan: no car
 **Go to API Keys**, copy the **API environment variable** (`cloudinary://<api_key>:<api_secret>@<cloud_name>`) and
 paste it into `CLOUDINARY_URL` in `apps/api/.env`. Without it everything works except uploads. The e2e tests use a fake
 store, so CI needs no account.
+
+### Facebook and Instagram (Meta app)
+
+Connecting clients' pages needs a Meta app ([developers.facebook.com](https://developers.facebook.com)) with Facebook
+Login for Business. Put its **App ID** and **App secret** in `META_APP_ID` / `META_APP_SECRET`, and add
+`http://localhost:3000/api/meta/callback` to its **Valid OAuth Redirect URIs**. In development mode the app works on
+the pages of its own admins and testers, with no review by Meta. Without the two keys connecting is off, and posts can
+be scheduled without a connected page. The e2e tests use a fake Meta.
 Upstash's free plan has a monthly command limit, which is plenty for development.
 
 ## Checks

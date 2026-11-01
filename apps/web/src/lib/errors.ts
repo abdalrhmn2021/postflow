@@ -36,6 +36,8 @@ const PATTERNS: [RegExp, keyof Dictionary["fields"]][] = [
   [/^File (\d+): Instagram takes videos of 3 s to 15 min$/, "reelLength"],
   [/^File (\d+): a video in a carousel is at most 60 s$/, "carouselVideo"],
   [/^Facebook takes a video on its own$/, "facebookVideo"],
+  [/^The client's Facebook page isn't connected$/, "facebookNotConnected"],
+  [/^The client's Instagram account isn't connected$/, "instagramNotConnected"],
   [/^Must be (?:jpg|mp4)/, "fileFormat"],
   [/^At most (\d+) MB$/, "fileSize"],
 ];

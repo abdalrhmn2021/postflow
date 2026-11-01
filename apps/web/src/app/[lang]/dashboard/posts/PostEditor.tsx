@@ -12,13 +12,19 @@ import type { Dictionary } from "@/i18n/dictionaries/ar";
 import { api } from "@/lib/api";
 import { countHashtags, INSTAGRAM_CAPTION_MAX, INSTAGRAM_HASHTAGS_MAX, scheduleProblems } from "@/lib/caption";
 import { errorText, fieldErrors } from "@/lib/errors";
-import type { Platform, Post, Role } from "@/lib/types";
+import type { Connected, Platform, Post, Role } from "@/lib/types";
 import { formatInZone, fromZonedInput, toZonedInput } from "@/lib/zoned-time";
 import { MediaPicker } from "./MediaPicker";
 import { PostPreview } from "./PostPreview";
 import { StatusBadge } from "@/components/StatusBadge";
 
-export type BrandOption = { id: string; name: string; timezone: string; zoneName: string };
+export type BrandOption = {
+  id: string;
+  name: string;
+  timezone: string;
+  zoneName: string;
+  connected: Connected; // its connected platforms; null = Meta isn't set up, nothing is checked
+};
 
 type Props = {
   locale: Locale;
@@ -86,6 +92,15 @@ export function PostEditor({ locale, t, errors, fields, role, brands, post, init
     formatInZone(scheduledAt, browserZone, locale) !== formatInZone(scheduledAt, brand.timezone, locale)
       ? formatInZone(scheduledAt, browserZone, locale)
       : null;
+
+  // A picked platform the client isn't connected to: it can be drafted, not scheduled.
+  const unlinked = !brand?.connected
+    ? null
+    : platforms.includes("FACEBOOK") && !brand.connected.facebook
+      ? "facebookNotConnected"
+      : platforms.includes("INSTAGRAM") && !brand.connected.instagram
+        ? "instagramNotConnected"
+        : null;
 
   // The counters follow Instagram's limits only when Instagram is picked (Facebook allows far more).
   const onInstagram = platforms.includes("INSTAGRAM");
@@ -163,7 +178,7 @@ export function PostEditor({ locale, t, errors, fields, role, brands, post, init
   // If scheduling is refused (POST_NOT_READY), the post stays saved as a draft and the reasons
   // show under the fields.
   function schedule() {
-    const problems = scheduleProblems({ caption, platforms, scheduledAt, media });
+    const problems = scheduleProblems({ caption, platforms, scheduledAt, media, connected: brand?.connected });
     if (Object.keys(problems).length > 0) {
       setNotice(null);
       setFormError(errors.POST_NOT_READY);
@@ -272,6 +287,7 @@ export function PostEditor({ locale, t, errors, fields, role, brands, post, init
             <div className="flex flex-wrap gap-2">
               {PLATFORMS.map((p) => {
                 const on = platforms.includes(p);
+                const linked = !brand?.connected || brand.connected[p === "FACEBOOK" ? "facebook" : "instagram"];
                 return (
                   <button
                     key={p}
@@ -288,11 +304,20 @@ export function PostEditor({ locale, t, errors, fields, role, brands, post, init
                   >
                     {on ? "✓ " : ""}
                     {t.platformNames[p]}
+                    {!linked && <span className="ms-1.5 text-xs font-normal opacity-75">· {t.notLinked}</span>}
                   </button>
                 );
               })}
             </div>
             {fieldError.platforms && <p className="text-sm text-bad">{fieldError.platforms}</p>}
+            {unlinked && !readOnly && (
+              <p className="text-xs text-muted">
+                {fields[unlinked]} ·{" "}
+                <a href={`/${locale}/dashboard/brands/${brandId}`} className="underline hover:text-ink">
+                  {t.connectOnBrand}
+                </a>
+              </p>
+            )}
           </fieldset>
 
           <MediaPicker
