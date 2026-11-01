@@ -17,6 +17,7 @@ import type { Brand } from "@/lib/types";
 type Props = {
   locale: Locale;
   t: Dictionary["brands"];
+  approvalT: Dictionary["approval"];
   errors: Dictionary["errors"];
   fields: Dictionary["fields"];
   timezones: { value: string; label: string }[];
@@ -26,7 +27,7 @@ type Props = {
 // A client's details: name, post language, time zone, writing voice. Owner only (the API checks too).
 // New  -> POST /api/brands, then the new client's page (to choose its editors).
 // Edit -> PATCH /api/brands/:id, then the page re-reads the brand (router.refresh()).
-export function BrandForm({ locale, t, errors, fields, timezones, brand }: Props) {
+export function BrandForm({ locale, t, approvalT, errors, fields, timezones, brand }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -41,6 +42,7 @@ export function BrandForm({ locale, t, errors, fields, timezones, brand }: Props
       language: data.get("language"),
       timezone: data.get("timezone"),
       voice: data.get("voice"), // "" is saved as "no voice"
+      requiresApproval: data.get("requiresApproval") === "on",
     };
     setLoading(true);
     setSaved(false);
@@ -108,6 +110,18 @@ export function BrandForm({ locale, t, errors, fields, timezones, brand }: Props
         error={fieldError.voice}
         hint={t.voiceHint}
       />
+      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-line p-3">
+        <input
+          type="checkbox"
+          name="requiresApproval"
+          defaultChecked={brand?.requiresApproval ?? false}
+          className="mt-1 size-4 accent-brand"
+        />
+        <span>
+          <span className="block font-medium">{approvalT.requiresApproval}</span>
+          <span className="block text-sm text-muted">{approvalT.requiresApprovalHint}</span>
+        </span>
+      </label>
       <div className="flex items-center gap-4">
         <Button type="submit" loading={loading}>
           {brand ? t.save : t.create}

@@ -27,6 +27,7 @@ export default async function NewBrandPage() {
         <Suspense fallback={<div className="h-96" />}>
           <OwnerOnly>
             <BrandForm
+              approvalT={dict.approval}
               locale={locale}
               t={t}
               errors={dict.errors}

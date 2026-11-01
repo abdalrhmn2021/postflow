@@ -14,6 +14,7 @@ import { countHashtags, INSTAGRAM_CAPTION_MAX, INSTAGRAM_HASHTAGS_MAX, scheduleP
 import { errorText, fieldErrors } from "@/lib/errors";
 import type { Connected, Platform, Post, Role } from "@/lib/types";
 import { formatInZone, fromZonedInput, toZonedInput } from "@/lib/zoned-time";
+import { ApprovalBar } from "./ApprovalBar";
 import { MediaPicker } from "./MediaPicker";
 import { PublishOutcome } from "./PublishOutcome";
 import { PostPreview } from "./PostPreview";
@@ -25,11 +26,13 @@ export type BrandOption = {
   timezone: string;
   zoneName: string;
   connected: Connected; // its connected platforms; null = Meta isn't set up, nothing is checked
+  requiresApproval: boolean; // the client approves each post before it's scheduled
 };
 
 type Props = {
   locale: Locale;
   t: Dictionary["posts"];
+  approvalT: Dictionary["approval"];
   errors: Dictionary["errors"];
   fields: Dictionary["fields"];
   role: Role;
@@ -40,7 +43,7 @@ type Props = {
 };
 
 const PLATFORMS: Platform[] = ["FACEBOOK", "INSTAGRAM"];
-type Action = "save" | "schedule" | "unschedule" | "delete";
+type Action = "save" | "schedule" | "unschedule" | "delete" | "approval";
 
 // The browser's own time zone. Only known in the browser: on the server (and in the first render
 // in the browser, so the two match) it's null, and the "that's 16:30 your time" line just waits.
@@ -59,7 +62,18 @@ function useBrowserZone(): string | null {
 //   a published post       -> read only, for everyone
 // A new post becomes a real one on its first save: the URL changes to /posts/<id> without
 // reloading the page, so what's typed and any error messages stay on screen.
-export function PostEditor({ locale, t, errors, fields, role, brands, post, initialBrandId, initialWhen }: Props) {
+export function PostEditor({
+  locale,
+  t,
+  approvalT,
+  errors,
+  fields,
+  role,
+  brands,
+  post,
+  initialBrandId,
+  initialWhen,
+}: Props) {
   const router = useRouter();
   const browserZone = useBrowserZone();
 
@@ -179,7 +193,14 @@ export function PostEditor({ locale, t, errors, fields, role, brands, post, init
   // If scheduling is refused (POST_NOT_READY), the post stays saved as a draft and the reasons
   // show under the fields.
   function schedule() {
-    const problems = scheduleProblems({ caption, platforms, scheduledAt, media, connected: brand?.connected });
+    const problems = scheduleProblems({
+      caption,
+      platforms,
+      scheduledAt,
+      media,
+      connected: brand?.connected,
+      approval: brand ? { required: brand.requiresApproval, state: current?.approval ?? "NONE" } : undefined,
+    });
     if (Object.keys(problems).length > 0) {
       setNotice(null);
       setFormError(errors.POST_NOT_READY);
@@ -199,6 +220,15 @@ export function PostEditor({ locale, t, errors, fields, role, brands, post, init
       },
       t.scheduledOk,
     );
+  }
+
+  // Save what's on screen (the client must see this version), then send it to the client.
+  function sendForApproval() {
+    void run("approval", async () => {
+      const saved = await save();
+      setCurrent(saved);
+      return api<Post>(`/posts/${saved.id}/approval`, { method: "POST" });
+    });
   }
 
   function unschedule() {
@@ -373,6 +403,25 @@ export function PostEditor({ locale, t, errors, fields, role, brands, post, init
               )}
             </div>
           </div>
+
+          {brand && (
+            <ApprovalBar
+              t={approvalT}
+              post={{
+                status,
+                approval: current?.approval ?? "NONE",
+                approvalNote: current?.approvalNote ?? null,
+                brand: {
+                  ...(current?.brand ?? { id: brand.id, name: brand.name, timezone: brand.timezone, account: null }),
+                  requiresApproval: brand.requiresApproval,
+                },
+              }}
+              canSend={!readOnly && (status === "DRAFT" || status === "FAILED")}
+              busy={busy !== null || uploading}
+              onSend={sendForApproval}
+            />
+          )}
+          {fieldError.approval && <p className="text-sm text-bad">{fieldError.approval}</p>}
 
           {!readOnly && (
             <div className="flex flex-wrap items-center gap-3 border-t border-line pt-5">

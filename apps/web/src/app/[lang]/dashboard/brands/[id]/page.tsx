@@ -9,6 +9,7 @@ import { timezoneName, timezoneOptions } from "@/lib/timezones";
 import type { Brand, StaffMember } from "@/lib/types";
 import { BrandForm } from "../BrandForm";
 import { AccountSection, type ConnectReturn } from "./AccountSection";
+import { ReviewLinks } from "./ReviewLinks";
 import { DeleteBrand } from "./DeleteBrand";
 import { EditorsForm } from "./EditorsForm";
 
@@ -45,7 +46,7 @@ async function BrandDetails({
   dict: Dictionary;
 }) {
   const [{ id }, query] = await Promise.all([params, searchParams]);
-  const [{ user }, brand, meta] = await Promise.all([
+  const [{ user, agency }, brand, meta] = await Promise.all([
     getSession(),
     serverApi<Brand>(`/brands/${encodeURIComponent(id)}`),
     serverApi<{ configured: boolean }>("/meta"),
@@ -53,6 +54,17 @@ async function BrandDetails({
   const t = dict.brands;
   const one = (v: string | string[] | undefined) => (typeof v === "string" ? v : undefined);
   const back: ConnectReturn = { pick: one(query.meta), error: one(query.meta_error), done: query.meta_done === "1" };
+  // The client's review link: the owner and managers send it.
+  const reviews =
+    user.role === "EDITOR" ? null : (
+      <section className="rounded-2xl border border-line bg-card p-6">
+        <h2 className="text-lg font-semibold">{dict.approval.linkTitle}</h2>
+        <p className="mt-1 text-sm text-muted">{dict.approval.linkHint}</p>
+        <div className="mt-5">
+          <ReviewLinks locale={locale} brand={brand} agencyName={agency.name} t={dict.approval} errors={dict.errors} />
+        </div>
+      </section>
+    );
   const accounts = (
     <AccountSection
       locale={locale}
@@ -64,7 +76,21 @@ async function BrandDetails({
     />
   );
 
-  if (user.role !== "OWNER") return <ReadOnly brand={brand} locale={locale} t={t} accounts={accounts} />;
+  if (user.role !== "OWNER") {
+    return (
+      <ReadOnly
+        brand={brand}
+        locale={locale}
+        t={t}
+        accounts={
+          <>
+            {accounts}
+            {reviews}
+          </>
+        }
+      />
+    );
+  }
 
   // The owner picks editors from everyone in the agency with the editor role.
   const staff = await serverApi<StaffMember[]>("/staff");
@@ -76,6 +102,7 @@ async function BrandDetails({
 
       <Section title={t.details}>
         <BrandForm
+          approvalT={dict.approval}
           locale={locale}
           t={t}
           errors={dict.errors}
@@ -86,6 +113,8 @@ async function BrandDetails({
       </Section>
 
       {accounts}
+
+      {reviews}
 
       <Section title={t.editorsTitle} hint={t.editorsHint}>
         <EditorsForm

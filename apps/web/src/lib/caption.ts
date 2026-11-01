@@ -39,8 +39,9 @@ export type ScheduleProblem =
   | "instagramHashtags"
   | "facebookNotConnected"
   | "instagramNotConnected"
+  | "notApproved"
   | MediaProblem;
-type Field = "caption" | "platforms" | "scheduledAt" | "media";
+type Field = "caption" | "platforms" | "scheduledAt" | "media" | "approval";
 
 export function scheduleProblems(
   post: {
@@ -49,6 +50,7 @@ export function scheduleProblems(
     scheduledAt: string | null;
     media: Pick<PostMedia, "type" | "width" | "height" | "duration">[];
     connected?: Connected; // the client's connected accounts; null / undefined = not checked
+    approval?: { required: boolean; state: string }; // the client's approval; undefined = not checked
   },
   now = new Date(),
 ): Partial<Record<Field, { key: ScheduleProblem; n: number }>> {
@@ -73,5 +75,6 @@ export function scheduleProblems(
   }
   const media = mediaProblem(post.platforms, post.media);
   if (media) problems.media = media;
+  if (post.approval?.required && post.approval.state !== "APPROVED") problems.approval = { key: "notApproved", n: 0 };
   return problems;
 }

@@ -46,6 +46,15 @@ describe("caption", () => {
     });
   });
 
+  it("a client that approves posts: only an approved one can be scheduled", () => {
+    const post = { caption: "x", platforms: ["FACEBOOK" as const], scheduledAt: LATER, media: [] };
+    expect(scheduleProblems({ ...post, approval: { required: true, state: "PENDING" } }, NOW)).toEqual({
+      approval: { key: "notApproved", n: 0 },
+    });
+    expect(scheduleProblems({ ...post, approval: { required: true, state: "APPROVED" } }, NOW)).toEqual({});
+    expect(scheduleProblems({ ...post, approval: { required: false, state: "NONE" } }, NOW)).toEqual({});
+  });
+
   it("Instagram with no file: the problem is under media", () => {
     expect(scheduleProblems({ caption: "x", platforms: ["INSTAGRAM"], scheduledAt: LATER, media: [] }, NOW)).toEqual({
       media: { key: "needsMedia", n: 0 },

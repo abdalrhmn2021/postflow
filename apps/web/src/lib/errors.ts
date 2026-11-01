@@ -38,6 +38,8 @@ const PATTERNS: [RegExp, keyof Dictionary["fields"]][] = [
   [/^Facebook takes a video on its own$/, "facebookVideo"],
   [/^The client's Facebook page isn't connected$/, "facebookNotConnected"],
   [/^The client's Instagram account isn't connected$/, "instagramNotConnected"],
+  [/^The client hasn't approved this post$/, "notApproved"],
+  [/^Tell the agency what to change$/, "noteNeeded"],
   [/^Must be (?:jpg|mp4)/, "fileFormat"],
   [/^At most (\d+) MB$/, "fileSize"],
 ];

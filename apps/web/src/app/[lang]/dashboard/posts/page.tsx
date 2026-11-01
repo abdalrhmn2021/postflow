@@ -26,7 +26,7 @@ import { DEFAULT_TIMEZONE } from "@/lib/timezones";
 import type { Brand, Post } from "@/lib/types";
 import { toZonedInput } from "@/lib/zoned-time";
 import { BrandFilter } from "./BrandFilter";
-import { MonthView, WeekView } from "./CalendarViews";
+import { approvalMarks, MonthView, WeekView } from "./CalendarViews";
 import { NoBrands } from "./NoBrands";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -256,7 +256,10 @@ function Drafts({
                 className="flex items-center gap-4 px-6 py-3 transition-colors hover:bg-surface"
               >
                 <StatusBadge status={post.status} label={t.status[post.status]} />
-                <span className="w-40 shrink-0 truncate font-medium">{post.brand.name}</span>
+                <span className="w-40 shrink-0 truncate font-medium">
+                  {post.approval !== "NONE" && <span className="me-1.5">{approvalMarks[post.approval]}</span>}
+                  {post.brand.name}
+                </span>
                 {post.media[0] ? (
                   <MediaThumb media={post.media[0]} size={32} className="shrink-0 rounded-md" />
                 ) : (

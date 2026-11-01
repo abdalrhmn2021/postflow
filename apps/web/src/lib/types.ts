@@ -18,7 +18,11 @@ export type Brand = {
   createdAt: string;
   editors: { id: string; name: string }[];
   account: SocialAccount | null; // its Facebook page (+ Instagram), once connected
+  requiresApproval: boolean; // the client approves each post before it's scheduled
 };
+
+// The client's answer about one post (phase 5).
+export type Approval = "NONE" | "PENDING" | "APPROVED" | "CHANGES_REQUESTED";
 
 // A client's connected Facebook page and the Instagram linked to it. The token stays on the server.
 export type SocialAccount = {
@@ -103,12 +107,27 @@ export type Post = {
     id: string;
     name: string;
     timezone: string;
+    requiresApproval: boolean;
     account: Pick<SocialAccount, "status" | "instagramId"> | null;
   };
+  approval: Approval;
+  approvalNote: string | null; // the client's words when asking for changes
+  approvalAt: string | null;
   createdBy: { id: string; name: string } | null; // null once that staff member was removed
   media: PostMedia[]; // in order: the first is the cover, more than one is a carousel
   failReason: string | null; // FAILED: why, one line per platform ("Instagram: <Meta's words>")
   publications: Publication[]; // what happened on each platform it was sent to
+};
+
+// GET /review/:token (public): what the client sees on the review link.
+export type ReviewPost = Pick<
+  Post,
+  "id" | "caption" | "platforms" | "scheduledAt" | "status" | "approval" | "approvalNote" | "approvalAt" | "media"
+>;
+export type ReviewPage = {
+  brand: { name: string; language: "ar" | "en"; timezone: string; agency: { name: string } };
+  expiresAt: string;
+  posts: ReviewPost[];
 };
 
 // A post on one platform: out (with a link to see it), or refused (with Meta's reason).

@@ -42,6 +42,7 @@ async function NewPost({ locale, dict, searchParams }: { locale: Locale; dict: D
   const at = one(search.at);
   return (
     <PostEditor
+      approvalT={dict.approval}
       locale={locale}
       t={dict.posts}
       errors={dict.errors}

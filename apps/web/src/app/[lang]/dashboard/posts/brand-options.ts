@@ -12,10 +12,11 @@ export async function brandOptions(locale: Locale): Promise<BrandOption[]> {
     serverApi<Brand[]>("/brands"),
     serverApi<{ configured: boolean }>("/meta"),
   ]);
-  return brands.map(({ id, name, timezone, account }) => ({
+  return brands.map(({ id, name, timezone, account, requiresApproval }) => ({
     id,
     name,
     timezone,
+    requiresApproval,
     zoneName: timezoneName(timezone, locale),
     connected: connectedPlatforms(account, meta.configured),
   }));

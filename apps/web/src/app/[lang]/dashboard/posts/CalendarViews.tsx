@@ -21,6 +21,9 @@ type Shared = {
 
 const VISIBLE_IN_MONTH = 3;
 
+// The client's answer on a draft, as a small mark (the editor shows it in words).
+export const approvalMarks = { PENDING: "⏳", APPROVED: "✓", CHANGES_REQUESTED: "✎", NONE: "" } as const;
+
 export function MonthView({
   locale,
   t,
@@ -150,6 +153,11 @@ export function WeekView({ locale, t, days, byDay, today, postHref, newHref }: S
                       </span>
                     </span>
                     <span className="flex flex-wrap gap-1 text-[11px] text-muted">
+                      {post.approval !== "NONE" && post.status === "DRAFT" && (
+                        <span className="rounded-full bg-surface px-1.5 font-medium">
+                          {approvalMarks[post.approval]}
+                        </span>
+                      )}
                       {post.platforms.map((p) => (
                         <span key={p} className="rounded-full bg-surface px-1.5">
                           {t.platformNames[p]}
