@@ -1,4 +1,5 @@
 import { MediaType, Platform } from "../generated/prisma/client.js";
+import type { Connected } from "../meta/account.js";
 
 // The platforms' own limits. Meta refuses a post past them, so we say so before scheduling,
 // not hours later when the worker tries to publish.
@@ -20,7 +21,13 @@ export function countHashtags(caption: string): number {
 }
 
 type MediaFacts = { type: MediaType; width: number; height: number; duration: number | null };
-type Schedulable = { caption: string; platforms: Platform[]; scheduledAt: Date | null; media: MediaFacts[] };
+type Schedulable = {
+  caption: string;
+  platforms: Platform[];
+  scheduledAt: Date | null;
+  media: MediaFacts[];
+  connected?: Connected; // the brand's connected accounts; undefined = not checked (Meta not set up)
+};
 
 // What still stops a post from being scheduled, one message per field - the same shape as a
 // VALIDATION_ERROR, so the editor shows each one under its input. {} = ready.
@@ -29,6 +36,14 @@ export function problemsBeforeScheduling(post: Schedulable, now = new Date()): R
 
   if (!post.caption.trim()) problems.caption = "Write the post first";
   if (post.platforms.length === 0) problems.platforms = "Pick at least one platform";
+  else if (post.connected) {
+    // Nobody could publish it: the worker would only find out at the time, and fail.
+    if (post.platforms.includes(Platform.FACEBOOK) && !post.connected.facebook) {
+      problems.platforms = "The client's Facebook page isn't connected";
+    } else if (post.platforms.includes(Platform.INSTAGRAM) && !post.connected.instagram) {
+      problems.platforms = "The client's Instagram account isn't connected";
+    }
+  }
 
   if (!post.scheduledAt) problems.scheduledAt = "Pick a time";
   else if (post.scheduledAt <= now) problems.scheduledAt = "The time has already passed";

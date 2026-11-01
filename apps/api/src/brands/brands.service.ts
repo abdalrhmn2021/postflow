@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { Prisma, Role } from "../generated/prisma/client.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { brandMediaPrefix, MediaStorage } from "../media/media-storage.js";
+import { accountSelect } from "../meta/account.js";
 import type { SessionUser } from "../auth/auth.service.js";
 import type { CreateBrandInput, SetEditorsInput, UpdateBrandInput } from "./brands.schemas.js";
 
@@ -19,6 +20,7 @@ const brandSelect = {
   timezone: true,
   createdAt: true,
   members: { select: { user: { select: { id: true, name: true } } }, orderBy: { createdAt: "asc" } },
+  account: { select: accountSelect }, // its Facebook page and Instagram, or null - never the token
 } satisfies Prisma.BrandSelect;
 
 type BrandRow = Prisma.BrandGetPayload<{ select: typeof brandSelect }>;

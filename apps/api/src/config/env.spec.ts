@@ -1,5 +1,6 @@
 import { validateEnv } from "./env.js";
 
+const KEY = Buffer.alloc(32, 7).toString("base64");
 const base = { DATABASE_URL: "postgresql://postflow:postflow@localhost:5432/postflow" };
 
 describe("validateEnv", () => {
@@ -44,6 +45,27 @@ describe("validateEnv", () => {
     expect(validateEnv({ ...base, CLOUDINARY_URL: "" }).CLOUDINARY_URL).toBeUndefined();
     expect(validateEnv(base).CLOUDINARY_URL).toBeUndefined();
     expect(() => validateEnv({ ...base, CLOUDINARY_URL: "https://cloudinary.com/x" })).toThrow(/CLOUDINARY_URL/);
+  });
+
+  it("Meta: both keys or neither; required in production", () => {
+    expect(validateEnv(base).META).toBeUndefined();
+    expect(validateEnv({ ...base, META_APP_ID: "1234567890", META_APP_SECRET: "0123456789abcdef0123" }).META).toEqual({
+      appId: "1234567890",
+      appSecret: "0123456789abcdef0123",
+      graphVersion: "v24.0",
+    });
+    expect(() => validateEnv({ ...base, META_APP_ID: "1234567890" })).toThrow(/set both, or neither/);
+    const prod = { ...base, NODE_ENV: "production", JWT_SECRET: "x".repeat(32), TOKEN_ENCRYPTION_KEY: KEY };
+    expect(() => validateEnv(prod)).toThrow(/META_APP_ID and META_APP_SECRET: required in production/);
+  });
+
+  it("TOKEN_ENCRYPTION_KEY: 32 bytes; a dev key in development, required in production", () => {
+    expect(Buffer.from(validateEnv(base).TOKEN_ENCRYPTION_KEY, "base64")).toHaveLength(32);
+    expect(validateEnv({ ...base, TOKEN_ENCRYPTION_KEY: KEY }).TOKEN_ENCRYPTION_KEY).toBe(KEY);
+    expect(() => validateEnv({ ...base, TOKEN_ENCRYPTION_KEY: "short" })).toThrow(/32 bytes/);
+    expect(() => validateEnv({ ...base, NODE_ENV: "production", JWT_SECRET: "x".repeat(32) })).toThrow(
+      /TOKEN_ENCRYPTION_KEY: required in production/,
+    );
   });
 
   it("reads TRUST_PROXY as a hop count when it is a number", () => {

@@ -56,7 +56,36 @@ const envSchema = z.object({
       })
       .optional(),
   ),
+
+  // The Meta app (developers.facebook.com -> the app -> App settings -> Basic) that connects clients'
+  // Facebook pages and Instagram accounts. Both or neither. Without them connecting is off and posts
+  // can be scheduled without a connected page (development only - required in production).
+  META_APP_ID: z.preprocess(emptyIsUnset, z.string().regex(/^\d+$/, "META_APP_ID is a number").optional()),
+  META_APP_SECRET: z.preprocess(emptyIsUnset, z.string().min(16, "META_APP_SECRET looks too short").optional()),
+  // The Graph API version every call uses. Meta keeps each version about two years.
+  META_GRAPH_VERSION: z
+    .string()
+    .regex(/^v\d+\.\d$/, "META_GRAPH_VERSION looks like v24.0")
+    .default("v24.0"),
+
+  // Encrypts the pages' access tokens in the database (AES-256-GCM): 32 random bytes, base64.
+  //   node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+  // Optional in development (a fixed dev key); required in production. Changing it makes every
+  // stored token unreadable: the clients' pages must then be connected again.
+  TOKEN_ENCRYPTION_KEY: z.preprocess(
+    emptyIsUnset,
+    z
+      .string()
+      .refine((v) => Buffer.from(v, "base64").length === 32, "TOKEN_ENCRYPTION_KEY must be 32 bytes in base64")
+      .optional(),
+  ),
 });
+
+function emptyIsUnset(v: unknown) {
+  return v === "" ? undefined : v;
+}
+
+export type MetaConfig = { appId: string; appSecret: string; graphVersion: string };
 
 export type CloudinaryConfig = { cloudName: string; apiKey: string; apiSecret: string };
 
@@ -69,8 +98,15 @@ export function parseCloudinaryUrl(value: string): CloudinaryConfig | null {
 }
 
 const DEV_JWT_SECRET = "postflow-development-only-secret-do-not-use-in-production";
+// 32 bytes, base64. Only ever used when NODE_ENV isn't production.
+const DEV_TOKEN_KEY = Buffer.from("postflow-dev-token-key-not-prod!").toString("base64");
 
-export type Env = Omit<z.infer<typeof envSchema>, "JWT_SECRET"> & { JWT_SECRET: string };
+type Parsed = z.infer<typeof envSchema>;
+export type Env = Omit<Parsed, "JWT_SECRET" | "TOKEN_ENCRYPTION_KEY" | "META_APP_ID" | "META_APP_SECRET"> & {
+  JWT_SECRET: string;
+  TOKEN_ENCRYPTION_KEY: string;
+  META: MetaConfig | undefined; // undefined = connecting pages is off
+};
 
 // Used by ConfigModule.forRoot({ validate }). Returns the cleaned values (defaults filled in, PORT a number).
 export function validateEnv(raw: Record<string, unknown>): Env {
@@ -79,12 +115,28 @@ export function validateEnv(raw: Record<string, unknown>): Env {
     const problems = result.error.issues.map((i) => `  - ${i.path.join(".") || "env"}: ${i.message}`);
     throw new Error(`Invalid environment variables:\n${problems.join("\n")}\nSee .env.example.`);
   }
-  const env = result.data;
-  if (!env.JWT_SECRET) {
-    if (env.NODE_ENV === "production") {
-      throw new Error("Invalid environment variables:\n  - JWT_SECRET: required in production\nSee .env.example.");
-    }
-    return { ...env, JWT_SECRET: DEV_JWT_SECRET };
+  const { JWT_SECRET, TOKEN_ENCRYPTION_KEY, META_APP_ID, META_APP_SECRET, ...env } = result.data;
+  const production = env.NODE_ENV === "production";
+
+  const problems: string[] = [];
+  if (production && !JWT_SECRET) problems.push("JWT_SECRET: required in production");
+  if (production && !TOKEN_ENCRYPTION_KEY) problems.push("TOKEN_ENCRYPTION_KEY: required in production");
+  if (Boolean(META_APP_ID) !== Boolean(META_APP_SECRET)) {
+    problems.push("META_APP_ID and META_APP_SECRET: set both, or neither");
+  } else if (production && !META_APP_ID) {
+    problems.push("META_APP_ID and META_APP_SECRET: required in production");
   }
-  return { ...env, JWT_SECRET: env.JWT_SECRET };
+  if (problems.length > 0) {
+    throw new Error(`Invalid environment variables:\n${problems.map((p) => `  - ${p}`).join("\n")}\nSee .env.example.`);
+  }
+
+  return {
+    ...env,
+    JWT_SECRET: JWT_SECRET ?? DEV_JWT_SECRET,
+    TOKEN_ENCRYPTION_KEY: TOKEN_ENCRYPTION_KEY ?? DEV_TOKEN_KEY,
+    META:
+      META_APP_ID && META_APP_SECRET
+        ? { appId: META_APP_ID, appSecret: META_APP_SECRET, graphVersion: env.META_GRAPH_VERSION }
+        : undefined,
+  };
 }

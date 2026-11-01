@@ -72,6 +72,7 @@ model Brand {
 
   members BrandMember[]
   posts   Post[]
+  account SocialAccount? // its Facebook page (+ Instagram), once the owner connects it (phase 3)
 
   // Two brands with the same name in one agency: no. The same name in two agencies: fine.
   @@unique([agencyId, name])
@@ -176,4 +177,33 @@ model PostMedia {
   createdAt DateTime @default(now())
 
   @@index([postId, position])
+}
+
+// Can we still post with the stored token?
+enum AccountStatus {
+  OK
+  NEEDS_RECONNECT // Meta refused the token (the person who connected it lost access, or changed password)
+}
+
+// A brand's Facebook page, and the Instagram professional account linked to that page, if any.
+// One per brand. Instagram has no connection of its own: Meta reaches it through the page.
+model SocialAccount {
+  id                String        @id @default(uuid())
+  brandId           String        @unique
+  brand             Brand         @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  pageId            String // Meta's id of the page
+  pageName          String
+  pagePicture       String? // a URL from Meta; it changes over time, so it's refreshed on each check
+  instagramId       String? // the Instagram account's id (instagram_business_account); null = none linked
+  instagramUsername String?
+  instagramPicture  String?
+  // The page's access token, encrypted (meta/token-cipher.ts) - never sent to the browser.
+  // A page token got from a long-lived user token doesn't expire, but Meta can still revoke it.
+  pageToken         String
+  status            AccountStatus @default(OK)
+  checkedAt         DateTime      @default(now()) // when Meta last answered for this token
+  connectedAt       DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([pageId]) // is this page already connected to another brand of the agency?
 }

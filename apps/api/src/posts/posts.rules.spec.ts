@@ -43,6 +43,25 @@ describe("problemsBeforeScheduling", () => {
   });
 });
 
+describe("problemsBeforeScheduling - connected accounts", () => {
+  const both = { ...ready, platforms: [Platform.FACEBOOK, Platform.INSTAGRAM], media: [SQUARE] };
+
+  it("not checked when Meta isn't set up (connected undefined)", () => {
+    expect(problemsBeforeScheduling(both, NOW)).toEqual({});
+  });
+
+  it("each platform needs its account connected", () => {
+    const check = (facebook: boolean, instagram: boolean) =>
+      problemsBeforeScheduling({ ...both, connected: { facebook, instagram } }, NOW).platforms;
+    expect(check(true, true)).toBeUndefined();
+    expect(check(false, false)).toBe("The client's Facebook page isn't connected");
+    expect(check(true, false)).toBe("The client's Instagram account isn't connected");
+    expect(
+      problemsBeforeScheduling({ ...ready, connected: { facebook: true, instagram: false } }, NOW).platforms,
+    ).toBeUndefined(); // Facebook only: Instagram doesn't matter
+  });
+});
+
 describe("problemsBeforeScheduling - files", () => {
   const insta = (...media: ReturnType<typeof image | typeof video>[]) =>
     problemsBeforeScheduling({ ...ready, platforms: [Platform.INSTAGRAM], media }, NOW).media;

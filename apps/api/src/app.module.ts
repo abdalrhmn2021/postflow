@@ -8,10 +8,12 @@ import { BrandsModule } from "./brands/brands.module.js";
 import { InvitesModule } from "./invites/invites.module.js";
 import { StaffModule } from "./staff/staff.module.js";
 import { MediaModule } from "./media/media.module.js";
+import { MetaModule } from "./meta/meta.module.js";
 import { PostsModule } from "./posts/posts.module.js";
 
 // The HTTP API. Each feature gets its own module here as the phases add them
-// (phase 1: AuthModule, BrandsModule, InvitesModule, StaffModule; phase 2: PostsModule, MediaModule).
+// (phase 1: AuthModule, BrandsModule, InvitesModule, StaffModule; phase 2: PostsModule, MediaModule;
+// phase 3: MetaModule).
 @Module({
   imports: [
     AppConfigModule,
@@ -23,6 +25,7 @@ import { PostsModule } from "./posts/posts.module.js";
     InvitesModule,
     StaffModule,
     MediaModule,
+    MetaModule,
     PostsModule,
   ],
 })

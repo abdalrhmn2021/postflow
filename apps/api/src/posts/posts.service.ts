@@ -12,6 +12,8 @@ import { BrandsService, visibleBrands } from "../brands/brands.service.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { brandMediaPrefix, MediaStorage } from "../media/media-storage.js";
 import { fileProblem, MEDIA_MAX } from "../media/media.rules.js";
+import { connectedPlatforms } from "../meta/account.js";
+import { MetaGraph } from "../meta/meta-graph.js";
 import { problemsBeforeScheduling } from "./posts.rules.js";
 import type {
   AttachMediaInput,
@@ -62,7 +64,15 @@ const postSelect = {
   publishedAt: true,
   createdAt: true,
   updatedAt: true,
-  brand: { select: { id: true, name: true, timezone: true } }, // timezone: the calendar shows times in it
+  // timezone: the calendar shows times in it. account: which platforms it can be published to.
+  brand: {
+    select: {
+      id: true,
+      name: true,
+      timezone: true,
+      account: { select: { status: true, instagramId: true } },
+    },
+  },
   createdBy: { select: { id: true, name: true } }, // null once that staff member is removed
   media: {
     select: {
@@ -99,17 +109,7 @@ function assertCanChange(user: SessionUser, post: PostRow) {
   if (user.role === Role.EDITOR && post.status !== PostStatus.DRAFT) throw editorsDraftOnly();
 }
 
-// The status a post has after a change (to its text, time, platforms or files):
-//   scheduled -> stays scheduled, so it must still be ready afterwards (else 400 POST_NOT_READY)
-//   failed    -> a draft again: someone is fixing it; then it's scheduled again
-//   draft     -> a draft
-function statusAfterChange(post: PostRow, after: Parameters<typeof problemsBeforeScheduling>[0]) {
-  if (post.status === PostStatus.SCHEDULED) {
-    const problems = problemsBeforeScheduling(after);
-    if (Object.keys(problems).length > 0) throw notReady(problems);
-  }
-  return post.status === PostStatus.FAILED ? PostStatus.DRAFT : post.status;
-}
+type Schedulable = Parameters<typeof problemsBeforeScheduling>[0];
 
 @Injectable()
 export class PostsService {
@@ -117,7 +117,27 @@ export class PostsService {
     private readonly prisma: PrismaService,
     private readonly brands: BrandsService,
     private readonly storage: MediaStorage,
+    private readonly meta: MetaGraph,
   ) {}
+
+  // What still stops this post (as it will be after a change) from being scheduled. {} = ready.
+  // Checks the brand's connected accounts too, once Meta is set up on this server.
+  private problems(post: PostRow, after: Partial<Schedulable> = {}) {
+    const connected = connectedPlatforms(post.brand.account, this.meta.configured);
+    return problemsBeforeScheduling({ ...post, connected, ...after });
+  }
+
+  // The status a post has after a change (to its text, time, platforms or files):
+  //   scheduled -> stays scheduled, so it must still be ready afterwards (else 400 POST_NOT_READY)
+  //   failed    -> a draft again: someone is fixing it; then it's scheduled again
+  //   draft     -> a draft
+  private statusAfterChange(post: PostRow, after: Partial<Schedulable>) {
+    if (post.status === PostStatus.SCHEDULED) {
+      const problems = this.problems(post, after);
+      if (Object.keys(problems).length > 0) throw notReady(problems);
+    }
+    return post.status === PostStatus.FAILED ? PostStatus.DRAFT : post.status;
+  }
 
   // The calendar: posts with a time in [from, to), earliest first.
   list(user: SessionUser, { from, to, brandId }: ListPostsQuery) {
@@ -156,7 +176,7 @@ export class PostsService {
   async update(user: SessionUser, id: string, input: UpdatePostInput) {
     const post = await this.get(user, id);
     assertCanChange(user, post);
-    const status = statusAfterChange(post, { ...post, ...input });
+    const status = this.statusAfterChange(post, input);
     return this.write(post, { ...input, status });
   }
 
@@ -166,7 +186,7 @@ export class PostsService {
     if (post.status === PostStatus.PUBLISHED) throw published();
     if (post.status === PostStatus.SCHEDULED) return post; // already done: asking twice is fine
 
-    const problems = problemsBeforeScheduling(post);
+    const problems = this.problems(post);
     if (Object.keys(problems).length > 0) throw notReady(problems);
     return this.write(post, { status: PostStatus.SCHEDULED });
   }
@@ -222,7 +242,7 @@ export class PostsService {
       throw badFile(problem);
     }
 
-    const status = statusAfterChange(post, { ...post, media: [...post.media, file] });
+    const status = this.statusAfterChange(post, { media: [...post.media, file] });
     const { publicId: name, url, format, width, height, bytes, duration } = file;
     try {
       return await this.write(post, {
@@ -245,7 +265,7 @@ export class PostsService {
     if (ids.length !== byId.size || !ids.every((mid) => byId.has(mid))) throw wrongOrder();
 
     const media = ids.map((mid) => byId.get(mid)!);
-    const status = statusAfterChange(post, { ...post, media });
+    const status = this.statusAfterChange(post, { media });
     return this.write(post, {
       status,
       media: { update: ids.map((mid, position) => ({ where: { id: mid }, data: { position } })) },
@@ -260,7 +280,7 @@ export class PostsService {
 
     const rest = post.media.filter((m) => m.id !== mediaId);
     // A scheduled Instagram post can't lose its last image - unschedule it first.
-    const status = statusAfterChange(post, { ...post, media: rest });
+    const status = this.statusAfterChange(post, { media: rest });
     const updated = await this.write(post, {
       status,
       media: {
