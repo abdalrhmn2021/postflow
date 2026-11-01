@@ -15,6 +15,7 @@ import { errorText, fieldErrors } from "@/lib/errors";
 import type { Connected, Platform, Post, Role } from "@/lib/types";
 import { formatInZone, fromZonedInput, toZonedInput } from "@/lib/zoned-time";
 import { MediaPicker } from "./MediaPicker";
+import { PublishOutcome } from "./PublishOutcome";
 import { PostPreview } from "./PostPreview";
 import { StatusBadge } from "@/components/StatusBadge";
 
@@ -81,7 +82,7 @@ export function PostEditor({ locale, t, errors, fields, role, brands, post, init
   const status = current?.status ?? "DRAFT";
   const media = current?.media ?? []; // the files are saved one by one as they're added, not with the form
   const canManage = role !== "EDITOR";
-  const readOnly = status === "PUBLISHED" || (!canManage && status !== "DRAFT");
+  const readOnly = status === "PUBLISHED" || status === "PUBLISHING" || (!canManage && status !== "DRAFT");
   const scheduledAt = when && brand ? fromZonedInput(when, brand.timezone) : null;
   // "That's 20:30 your time" - only when the visitor's clock differs from the client's
   // (not for Gaza vs Hebron: different zone names, same hour).
@@ -219,8 +220,13 @@ export function PostEditor({ locale, t, errors, fields, role, brands, post, init
     }
   }
 
-  const lockedText =
-    status === "PUBLISHED" ? t.lockedPublished : status === "FAILED" ? t.lockedFailed : t.lockedScheduled;
+  const lockedText = {
+    PUBLISHED: t.lockedPublished,
+    PUBLISHING: t.lockedPublishing,
+    FAILED: t.lockedFailed,
+    SCHEDULED: t.lockedScheduled,
+    DRAFT: t.lockedScheduled, // never shown: a draft is never read-only
+  }[status];
 
   return (
     <div className="flex flex-col gap-6">
@@ -233,6 +239,7 @@ export function PostEditor({ locale, t, errors, fields, role, brands, post, init
       {!readOnly && status === "FAILED" && (
         <p className="rounded-xl border border-bad/30 bg-bad/5 px-4 py-3 text-sm text-bad">{t.failedHint}</p>
       )}
+      {current && <PublishOutcome post={current} t={t} />}
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5 rounded-2xl border border-line bg-card p-6">

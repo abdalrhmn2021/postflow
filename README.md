@@ -2,7 +2,9 @@
 
 **Social media scheduling for agencies.** An agency plans its clients' posts on one calendar, the client approves them from a link, and each post goes out on Facebook and Instagram at its time - automatically. Captions are drafted by AI in the brand's own voice.
 
-> Status: **phase 3 (Facebook and Instagram)** - code done, waiting for the Meta app. Done: each client connects its Facebook page (and the Instagram professional account linked to it) through Facebook's login - a one-time `state` against forged answers, the person's pages listed to pick from, the page token stored encrypted (AES-256-GCM) and never sent to the browser, `appsecret_proof` on every Graph API call; a page can't be on two clients of one agency; check / reconnect / disconnect; scheduling needs each picked platform connected (once Meta is set up). Website: a "Facebook and Instagram" card on the client's page, the page picker, badges on the clients list, warnings in the post editor.
+> Status: **phase 4 (publishing)** - code done, waiting for the Meta app. Scheduling a post puts a delayed job on the publish queue (BullMQ) for its exact time - nothing polls the database. The worker takes it then, locks the post (PUBLISHING), and sends it: Facebook (text, a photo, several photos, a video) and Instagram (an image, a Reel, a carousel), images as JPEG and MOV as MP4 through Cloudinary. Each platform is recorded with its link or Meta's reason; a platform already out is never sent twice. Meta busy -> tried again after 1, 2, 4 minutes; refused for good -> FAILED with the reason; a refused token marks the page "needs connecting again". An hourly sweep re-queues any scheduled post whose job is missing. Website: "Publishing…", the reason a post failed, links to the published post.
+>
+> **Phase 3 (Facebook and Instagram)** - code done, waiting for the Meta app. each client connects its Facebook page (and the Instagram professional account linked to it) through Facebook's login - a one-time `state` against forged answers, the person's pages listed to pick from, the page token stored encrypted (AES-256-GCM) and never sent to the browser, `appsecret_proof` on every Graph API call; a page can't be on two clients of one agency; check / reconnect / disconnect; scheduling needs each picked platform connected (once Meta is set up). Website: a "Facebook and Instagram" card on the client's page, the page picker, badges on the clients list, warnings in the post editor.
 >
 > **Phase 2 (posts)** - done. the posts table (draft -> scheduled -> published / failed), the posts API (calendar range, drafts with no time, create, edit, schedule, unschedule, delete; editors draft for their brands, the owner and managers schedule; Instagram's caption and hashtag limits checked before scheduling); website: the posts calendar (month and week, each post on its day in its client's time zone, a client filter, + on a day for a new post, drafts with no time beside it) and the post editor - client, text with Instagram's counters, platforms, a time in the client's own time zone, a live preview, save / schedule / unschedule / delete by role. Images and videos: in the editor, drop or pick files - each uploads with a progress bar, then can be moved or removed; a file Instagram would refuse is marked red; the preview shows the real files (Facebook grid, Instagram carousel) and the calendar a thumbnail. Behind it, the browser uploads straight to Cloudinary with a ticket the API signs for one file name of that client; the API then reads the file's real size and format from Cloudinary and attaches it (up to 10 per post, reorder, remove); Meta's rules checked before scheduling (Instagram needs a file, images 4:5 to 1.91:1, Reels 3 s - 15 min, 60 s in a carousel; Facebook: photos, or one video alone).
 >
@@ -15,7 +17,7 @@
 | Web      | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4 |
 | API      | NestJS 12, TypeScript                                         |
 | Database | PostgreSQL 17 + Prisma 7                                      |
-| Jobs     | Redis 7 + BullMQ (phase 4)                                    |
+| Jobs     | Redis 7 + BullMQ                                              |
 | Tests    | Vitest + Supertest, Playwright (phase 7)                      |
 | CI       | GitHub Actions                                                |
 
@@ -57,9 +59,10 @@ postflow/
 │       │   ├── staff/       the agency's people: /api/staff, change a role, remove someone
 │       │   ├── posts/       /api/posts: the calendar, drafts, scheduling, files; posts.rules.ts = what a post needs before it's scheduled
 │       │   ├── meta/        Facebook login and pages: MetaGraph (what the API needs) and GraphApiMeta; token-cipher.ts
+│       │   ├── publish/     the publish queue (PublishQueue: delayed jobs) and PublisherService (one post -> Meta)
 │       │   ├── media/       file storage: MediaStorage (what the API needs) and CloudinaryStorage (signed uploads, details, delete)
 │       │   ├── common/      shared pieces (request validation)
-│       │   ├── worker/      worker module + heartbeat
+│       │   ├── worker/      worker module: heartbeat, PublishWorker (takes jobs at their time, hourly sweep)
 │       │   ├── main.ts      API entry point
 │       │   └── worker.ts    worker entry point
 │       └── test/            e2e tests (real database)

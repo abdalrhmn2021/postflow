@@ -4,6 +4,7 @@ import type { PostStatus } from "@/lib/types";
 export const statusColors: Record<PostStatus, string> = {
   DRAFT: "bg-line/60 text-muted",
   SCHEDULED: "bg-brand/15 text-brand",
+  PUBLISHING: "bg-accent/20 text-ink animate-pulse",
   PUBLISHED: "bg-good/15 text-good",
   FAILED: "bg-bad/15 text-bad",
 };
@@ -12,6 +13,7 @@ export const statusColors: Record<PostStatus, string> = {
 export const statusMarks: Record<PostStatus, string> = {
   DRAFT: "border-muted/50",
   SCHEDULED: "border-brand",
+  PUBLISHING: "border-accent",
   PUBLISHED: "border-good",
   FAILED: "border-bad",
 };
@@ -20,6 +22,7 @@ export const statusMarks: Record<PostStatus, string> = {
 export const statusDots: Record<PostStatus, string> = {
   DRAFT: "bg-muted/60",
   SCHEDULED: "bg-brand",
+  PUBLISHING: "bg-accent",
   PUBLISHED: "bg-good",
   FAILED: "bg-bad",
 };

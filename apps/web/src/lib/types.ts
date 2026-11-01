@@ -85,7 +85,8 @@ export type InvitePreview = {
 
 export type Platform = "FACEBOOK" | "INSTAGRAM";
 // DRAFT -> SCHEDULED -> PUBLISHED, or FAILED when the worker couldn't publish it (phase 4).
-export type PostStatus = "DRAFT" | "SCHEDULED" | "PUBLISHED" | "FAILED";
+// PUBLISHING: the worker is sending it to Meta right now; nobody can change it meanwhile.
+export type PostStatus = "DRAFT" | "SCHEDULED" | "PUBLISHING" | "PUBLISHED" | "FAILED";
 
 // GET /posts (the calendar range), /posts/unscheduled, /posts/:id. Times are UTC ISO strings;
 // show them in brand.timezone (lib/zoned-time.ts), not in the visitor's zone.
@@ -106,6 +107,16 @@ export type Post = {
   };
   createdBy: { id: string; name: string } | null; // null once that staff member was removed
   media: PostMedia[]; // in order: the first is the cover, more than one is a carousel
+  failReason: string | null; // FAILED: why, one line per platform ("Instagram: <Meta's words>")
+  publications: Publication[]; // what happened on each platform it was sent to
+};
+
+// A post on one platform: out (with a link to see it), or refused (with Meta's reason).
+export type Publication = {
+  platform: Platform;
+  status: "PUBLISHED" | "FAILED";
+  url: string | null;
+  error: string | null;
 };
 
 // One image or video of a post, as the API read it from Cloudinary. url: the original file;
