@@ -68,6 +68,15 @@ const envSchema = z.object({
     .regex(/^v\d+\.\d$/, "META_GRAPH_VERSION looks like v24.0")
     .default("v24.0"),
 
+  // Writes caption ideas (phase 6): a Google AI Studio key (aistudio.google.com -> Get API key).
+  // Empty = the "write a caption" button says it isn't set up; everything else works.
+  GEMINI_API_KEY: z.preprocess(emptyIsUnset, z.string().min(20, "GEMINI_API_KEY looks too short").optional()),
+  // Which model. The alias follows Google's newest Flash model, so it doesn't stop working when one is retired.
+  GEMINI_MODEL: z
+    .string()
+    .regex(/^[\w.-]+$/, "GEMINI_MODEL is a model name")
+    .default("gemini-flash-latest"),
+
   // Encrypts the pages' access tokens in the database (AES-256-GCM): 32 random bytes, base64.
   //   node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
   // Optional in development (a fixed dev key); required in production. Changing it makes every

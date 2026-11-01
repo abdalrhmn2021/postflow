@@ -12,11 +12,12 @@ import { MetaModule } from "./meta/meta.module.js";
 import { PostsModule } from "./posts/posts.module.js";
 import { PublishModule } from "./publish/publish.module.js";
 import { ReviewModule } from "./review/review.module.js";
+import { AiModule } from "./ai/ai.module.js";
 
 // The HTTP API. Each feature gets its own module here as the phases add them
 // (phase 1: AuthModule, BrandsModule, InvitesModule, StaffModule; phase 2: PostsModule, MediaModule;
 // phase 3: MetaModule; phase 4: PublishModule - the API only adds jobs, the worker publishes;
-// phase 5: ReviewModule).
+// phase 5: ReviewModule; phase 6: AiModule).
 @Module({
   imports: [
     AppConfigModule,
@@ -32,6 +33,7 @@ import { ReviewModule } from "./review/review.module.js";
     PublishModule,
     PostsModule,
     ReviewModule,
+    AiModule,
   ],
 })
 export class AppModule {}
