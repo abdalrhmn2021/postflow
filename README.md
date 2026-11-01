@@ -2,7 +2,7 @@
 
 **Social media scheduling for agencies.** An agency plans its clients' posts on one calendar, the client approves them from a link, and each post goes out on Facebook and Instagram at its time - automatically. Captions are drafted by AI in the brand's own voice.
 
-> Status: **phase 2 (posts)** - in progress. Done: the posts table (draft -> scheduled -> published / failed), the posts API (calendar range, drafts with no time, create, edit, schedule, unschedule, delete; editors draft for their brands, the owner and managers schedule; Instagram's caption and hashtag limits checked before scheduling); website: the posts calendar (month and week, each post on its day in its client's time zone, a client filter, + on a day for a new post, drafts with no time beside it) and the post editor - client, text with Instagram's counters, platforms, a time in the client's own time zone, a live preview, save / schedule / unschedule / delete by role.
+> Status: **phase 2 (posts)** - in progress. Done: the posts table (draft -> scheduled -> published / failed), the posts API (calendar range, drafts with no time, create, edit, schedule, unschedule, delete; editors draft for their brands, the owner and managers schedule; Instagram's caption and hashtag limits checked before scheduling); website: the posts calendar (month and week, each post on its day in its client's time zone, a client filter, + on a day for a new post, drafts with no time beside it) and the post editor - client, text with Instagram's counters, platforms, a time in the client's own time zone, a live preview, save / schedule / unschedule / delete by role. Images and videos (API): the browser uploads straight to Cloudinary with a ticket the API signs for one file name of that client; the API then reads the file's real size and format from Cloudinary and attaches it (up to 10 per post, reorder, remove); Meta's rules checked before scheduling (Instagram needs a file, images 4:5 to 1.91:1, Reels 3 s - 15 min, 60 s in a carousel; Facebook: photos, or one video alone).
 >
 > **Phase 1 (accounts and agencies)** - done (API and website). Done: database tables, agency sign-up, login (cookie), route protection and roles, brands (clients) with editor assignment, staff invites (link), staff list / role change / removal (API complete). Website: Arabic / English (language in the URL: /ar, /en), font, colors, base components, agency sign-up and login pages, a protected dashboard (top bar, sections, log out), clients pages (list, add, edit, editors, delete; read-only for managers and editors), team page (invite by link - copy or WhatsApp, open invites, role change, removal) and the invite page where a new staff member makes their account.
 
@@ -52,7 +52,8 @@ postflow/
 │       │   ├── brands/      an agency's clients: /api/brands, editors per brand
 │       │   ├── invites/     staff invites: the owner makes a link, the person opens it and makes an account
 │       │   ├── staff/       the agency's people: /api/staff, change a role, remove someone
-│       │   ├── posts/       /api/posts: the calendar, drafts, scheduling; posts.rules.ts = what a post needs before it's scheduled
+│       │   ├── posts/       /api/posts: the calendar, drafts, scheduling, files; posts.rules.ts = what a post needs before it's scheduled
+│       │   ├── media/       file storage: MediaStorage (what the API needs) and CloudinaryStorage (signed uploads, details, delete)
 │       │   ├── common/      shared pieces (request validation)
 │       │   ├── worker/      worker module + heartbeat
 │       │   ├── main.ts      API entry point
@@ -89,6 +90,13 @@ Skip `npm run db:up` and use two free hosted services instead - nothing to insta
 2. **Redis - [Upstash](https://upstash.com):** create a Redis database, copy its `rediss://...` URL into `REDIS_URL`.
 
 Neon's free database sleeps after 5 idle minutes; the first request after that takes a moment longer.
+
+### Images and videos (Cloudinary)
+
+Post files are stored on [Cloudinary](https://cloudinary.com) (free plan: no card needed). In its dashboard press
+**Go to API Keys**, copy the **API environment variable** (`cloudinary://<api_key>:<api_secret>@<cloud_name>`) and
+paste it into `CLOUDINARY_URL` in `apps/api/.env`. Without it everything works except uploads. The e2e tests use a fake
+store, so CI needs no account.
 Upstash's free plan has a monthly command limit, which is plenty for development.
 
 ## Checks

@@ -1,15 +1,19 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Put, Query } from "@nestjs/common";
 import { Role } from "../generated/prisma/client.js";
 import type { SessionUser } from "../auth/auth.service.js";
 import { CurrentUser, Roles } from "../auth/decorators.js";
 import { ZodValidationPipe } from "../common/zod-validation.pipe.js";
 import {
+  attachMediaSchema,
   createPostSchema,
   listPostsSchema,
+  orderMediaSchema,
   unscheduledPostsSchema,
   updatePostSchema,
+  type AttachMediaInput,
   type CreatePostInput,
   type ListPostsQuery,
+  type OrderMediaInput,
   type UnscheduledPostsQuery,
   type UpdatePostInput,
 } from "./posts.schemas.js";
@@ -81,5 +85,44 @@ export class PostsController {
   @HttpCode(204)
   remove(@CurrentUser() user: SessionUser, @Param("id") id: string) {
     return this.posts.remove(user, id);
+  }
+
+  // Files. Same rule as changing the post: an editor only on a draft, nobody on a published post.
+  // Each answers with the whole post, so the editor just shows what comes back.
+
+  // POST /api/posts/:id/media/upload -> { publicId, url, fields } - POST the file to url with fields
+  //   | 400 MEDIA_LIMIT (10 already) | 503 MEDIA_NOT_CONFIGURED (no CLOUDINARY_URL)
+  @Post(":id/media/upload")
+  @HttpCode(200)
+  uploadTicket(@CurrentUser() user: SessionUser, @Param("id") id: string) {
+    return this.posts.uploadTicket(user, id);
+  }
+
+  // POST /api/posts/:id/media { publicId, type: IMAGE | VIDEO } -> the post with the file at the end
+  //   | 404 MEDIA_NOT_FOUND | 400 VALIDATION_ERROR { fields: { file } } | 400 POST_NOT_READY (a scheduled post)
+  @Post(":id/media")
+  @HttpCode(200)
+  attachMedia(
+    @CurrentUser() user: SessionUser,
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(attachMediaSchema)) body: AttachMediaInput,
+  ) {
+    return this.posts.attachMedia(user, id, body);
+  }
+
+  // PUT /api/posts/:id/media/order { ids: [every file id, in the new order] } -> the post
+  @Put(":id/media/order")
+  orderMedia(
+    @CurrentUser() user: SessionUser,
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(orderMediaSchema)) body: OrderMediaInput,
+  ) {
+    return this.posts.orderMedia(user, id, body);
+  }
+
+  // DELETE /api/posts/:id/media/:mediaId -> the post without it (the file is deleted from Cloudinary too)
+  @Delete(":id/media/:mediaId")
+  removeMedia(@CurrentUser() user: SessionUser, @Param("id") id: string, @Param("mediaId") mediaId: string) {
+    return this.posts.removeMedia(user, id, mediaId);
   }
 }

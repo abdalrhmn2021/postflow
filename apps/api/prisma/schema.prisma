@@ -144,7 +144,36 @@ model Post {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
+  media PostMedia[] // images and videos, in the order they appear (a carousel when more than one)
+
   @@index([brandId, scheduledAt]) // the calendar: one brand's posts between two dates
   @@index([status, scheduledAt]) // the worker (phase 4): scheduled posts whose time has come
   @@index([createdById])
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+}
+
+// One image or video of a post. The file itself lives on Cloudinary (the browser uploads it there
+// directly); this row is what the API checked about it - Meta needs a public URL to fetch at publish time.
+model PostMedia {
+  id       String    @id @default(uuid())
+  postId   String
+  post     Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  type     MediaType
+  // Cloudinary's name for the file: postflow/<agencyId>/<brandId>/<random>. The API signs the upload
+  // for exactly this name, so a file can only ever be attached to a post of the brand it was made for.
+  publicId String    @unique
+  url      String // https://res.cloudinary.com/... (the original; phase 4 asks Cloudinary for a JPEG for Instagram)
+  format   String // jpg, png, webp, heic, mp4, mov
+  width    Int
+  height   Int
+  bytes    Int
+  duration Float? // seconds, videos only
+  position Int // 0, 1, 2 ... - the order in the post
+  createdAt DateTime @default(now())
+
+  @@index([postId, position])
 }

@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { Platform } from "../generated/prisma/client.js";
+import { MediaType, Platform } from "../generated/prisma/client.js";
+import { MEDIA_MAX } from "../media/media.rules.js";
 import { CAPTION_MAX } from "./posts.rules.js";
 
 // The longest range one calendar request may ask for: a month view with the days around it.
@@ -38,7 +39,25 @@ export const listPostsSchema = z
 // GET /posts/unscheduled?brandId=...  ->  drafts that have no time yet (they aren't on the calendar)
 export const unscheduledPostsSchema = z.object({ brandId: id.optional() });
 
+// POST /posts/:id/media - a file the browser has just uploaded with the ticket from /media/upload.
+// Only its name and kind: everything else (size, format, width ...) the API asks Cloudinary itself.
+export const attachMediaSchema = z.object({
+  publicId: z.string().min(1, "Required").max(300),
+  type: z.enum(MediaType, "Must be IMAGE or VIDEO"),
+});
+
+// PUT /posts/:id/media/order - every file of the post, in the new order.
+export const orderMediaSchema = z.object({
+  ids: z
+    .array(id)
+    .min(1, "Required")
+    .max(MEDIA_MAX)
+    .refine((ids) => new Set(ids).size === ids.length, "Each file once"),
+});
+
 export type CreatePostInput = z.infer<typeof createPostSchema>;
 export type UpdatePostInput = z.infer<typeof updatePostSchema>;
 export type ListPostsQuery = z.infer<typeof listPostsSchema>;
 export type UnscheduledPostsQuery = z.infer<typeof unscheduledPostsSchema>;
+export type AttachMediaInput = z.infer<typeof attachMediaSchema>;
+export type OrderMediaInput = z.infer<typeof orderMediaSchema>;

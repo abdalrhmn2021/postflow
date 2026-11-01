@@ -38,7 +38,35 @@ const envSchema = z.object({
     .string()
     .default("loopback")
     .transform((v) => (/^\d+$/.test(v) ? Number(v) : v)),
+
+  // Where post images and videos are stored: the "API environment variable" from the Cloudinary
+  // dashboard, cloudinary://<api_key>:<api_secret>@<cloud_name>. Optional: without it everything
+  // works except uploads, which answer 503 MEDIA_NOT_CONFIGURED. Empty counts as not set.
+  CLOUDINARY_URL: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z
+      .string()
+      .transform((v, ctx) => {
+        const parsed = parseCloudinaryUrl(v);
+        if (!parsed) {
+          ctx.addIssue({ code: "custom", message: "Must look like cloudinary://<api_key>:<api_secret>@<cloud_name>" });
+          return z.NEVER;
+        }
+        return parsed;
+      })
+      .optional(),
+  ),
 });
+
+export type CloudinaryConfig = { cloudName: string; apiKey: string; apiSecret: string };
+
+// cloudinary://123456789012345:AbCdEf-gHiJ@my-cloud -> { cloudName, apiKey, apiSecret }, or null.
+export function parseCloudinaryUrl(value: string): CloudinaryConfig | null {
+  const match = /^cloudinary:\/\/([^:@/\s]+):([^@/\s]+)@([\w-]+)$/.exec(value.trim());
+  if (!match) return null;
+  const [, apiKey, apiSecret, cloudName] = match;
+  return { cloudName, apiKey, apiSecret };
+}
 
 const DEV_JWT_SECRET = "postflow-development-only-secret-do-not-use-in-production";
 

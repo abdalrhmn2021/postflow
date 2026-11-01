@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma, Role } from "../generated/prisma/client.js";
 import { PrismaService } from "../prisma/prisma.service.js";
+import { brandMediaPrefix, MediaStorage } from "../media/media-storage.js";
 import type { SessionUser } from "../auth/auth.service.js";
 import type { CreateBrandInput, SetEditorsInput, UpdateBrandInput } from "./brands.schemas.js";
 
@@ -43,7 +44,10 @@ function isPrismaError(err: unknown, code: string) {
 
 @Injectable()
 export class BrandsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storage: MediaStorage,
+  ) {}
 
   async list(user: SessionUser) {
     const brands = await this.prisma.brand.findMany({
@@ -92,6 +96,8 @@ export class BrandsService {
   async remove(user: SessionUser, id: string) {
     const { count } = await this.prisma.brand.deleteMany({ where: { id, agencyId: user.agencyId } });
     if (count === 0) throw notFound();
+    // Its posts and their file rows went with it (cascade); the files on Cloudinary go now.
+    await this.storage.removePrefix(brandMediaPrefix(user.agencyId, id));
   }
 
   // Replaces the brand's editors with exactly these users.

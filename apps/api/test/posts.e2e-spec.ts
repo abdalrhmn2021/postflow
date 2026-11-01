@@ -4,8 +4,10 @@ import type { App } from "supertest/types.js";
 import { hashPassword } from "../src/auth/password.js";
 import { PostStatus, Role } from "../src/generated/prisma/client.js";
 import { PrismaService } from "../src/prisma/prisma.service.js";
+import { MediaStorage } from "../src/media/media-storage.js";
 import { RedisService } from "../src/redis/redis.service.js";
 import { startApp, uniqueRun } from "./app.js";
+import { FakeMediaStorage } from "./fake-media-storage.js";
 
 const RUN = uniqueRun();
 const PASSWORD = "a-long-password";
@@ -17,6 +19,7 @@ type Agent = ReturnType<typeof request.agent>;
 describe("posts", () => {
   let app: INestApplication<App>;
   let prisma: PrismaService;
+  const storage = new FakeMediaStorage();
   const ips: string[] = [];
 
   // Agency A: owner, manager, an editor on the burger brand only. Agency B: an owner.
@@ -51,7 +54,7 @@ describe("posts", () => {
   }
 
   beforeAll(async () => {
-    app = await startApp();
+    app = await startApp((b) => b.overrideProvider(MediaStorage).useValue(storage));
     prisma = app.get(PrismaService);
 
     const a = await registerOwner("a");
@@ -129,6 +132,14 @@ describe("posts", () => {
       .send({ platforms: ["FACEBOOK", "INSTAGRAM"], scheduledAt: at })
       .expect(200);
     expect(draft.body).toMatchObject({ caption: "عرض الجمعة", platforms: ["FACEBOOK", "INSTAGRAM"] });
+
+    // Instagram needs an image: the editor uploads one (ticket -> the file to the store -> attach).
+    expect((await managerA.post(`/api/posts/${postId}/schedule`).expect(400)).body.fields).toEqual({
+      media: "Instagram needs an image or a video",
+    });
+    const { publicId } = (await editorA.post(`/api/posts/${postId}/media/upload`).expect(200)).body;
+    storage.upload(publicId);
+    await editorA.post(`/api/posts/${postId}/media`).send({ publicId, type: "IMAGE" }).expect(200);
 
     const res = await managerA.post(`/api/posts/${postId}/schedule`).expect(200);
     expect(res.body).toMatchObject({ status: "SCHEDULED", scheduledAt: at });
@@ -248,8 +259,9 @@ describe("posts", () => {
     expect((await ownerA.get(`/api/posts/${postId}`).expect(200)).body.createdBy).toBeNull();
   });
 
-  it("deleting a brand deletes its posts", async () => {
+  it("deleting a brand deletes its posts, and its files on the store", async () => {
     await ownerA.delete(`/api/brands/${burgerId}`).expect(204);
     expect(await prisma.post.count({ where: { brandId: burgerId } })).toBe(0);
+    expect(storage.removed.at(-1)).toMatch(new RegExp(`/${burgerId}/\\*$`));
   });
 });

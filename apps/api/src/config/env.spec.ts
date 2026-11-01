@@ -37,6 +37,15 @@ describe("validateEnv", () => {
     expect(() => validateEnv({ ...base, JWT_SECRET: "", NODE_ENV: "production" })).toThrow(/required in production/);
   });
 
+  it("reads CLOUDINARY_URL into its three parts; empty or missing = uploads off", () => {
+    expect(
+      validateEnv({ ...base, CLOUDINARY_URL: "cloudinary://123456789012345:AbC-d_Ef@gspwkbou" }).CLOUDINARY_URL,
+    ).toEqual({ cloudName: "gspwkbou", apiKey: "123456789012345", apiSecret: "AbC-d_Ef" });
+    expect(validateEnv({ ...base, CLOUDINARY_URL: "" }).CLOUDINARY_URL).toBeUndefined();
+    expect(validateEnv(base).CLOUDINARY_URL).toBeUndefined();
+    expect(() => validateEnv({ ...base, CLOUDINARY_URL: "https://cloudinary.com/x" })).toThrow(/CLOUDINARY_URL/);
+  });
+
   it("reads TRUST_PROXY as a hop count when it is a number", () => {
     expect(validateEnv(base).TRUST_PROXY).toBe("loopback");
     expect(validateEnv({ ...base, TRUST_PROXY: "2" }).TRUST_PROXY).toBe(2);
