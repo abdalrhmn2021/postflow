@@ -65,6 +65,8 @@ model Brand {
   language  String   @default("ar")
   voice     String? // how the brand talks - given to the AI when it drafts captions (phase 6)
   timezone  String   @default("Asia/Hebron") // the calendar shows times in this zone; the database stores UTC
+  // The client approves each post (from a review link) before it can be scheduled (phase 5).
+  requiresApproval Boolean @default(false)
   agencyId  String
   agency    Agency   @relation(fields: [agencyId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
@@ -72,7 +74,8 @@ model Brand {
 
   members BrandMember[]
   posts   Post[]
-  account SocialAccount? // its Facebook page (+ Instagram), once the owner connects it (phase 3)
+  account     SocialAccount? // its Facebook page (+ Instagram), once the owner connects it (phase 3)
+  reviewLinks ReviewLink[] // links the client opens to approve posts (phase 5)
 
   // Two brands with the same name in one agency: no. The same name in two agencies: fine.
   @@unique([agencyId, name])
@@ -118,7 +121,8 @@ enum Platform {
 }
 
 // A post's life:  DRAFT -> SCHEDULED -> PUBLISHING -> PUBLISHED, or FAILED if Meta says no.
-// Phase 5 adds the client's approval between DRAFT and SCHEDULED.
+// The client's approval is its own field (Post.approval): a draft is sent for approval, and a brand
+// with requiresApproval can only schedule approved posts.
 enum PostStatus {
   DRAFT // being written; anyone on the brand can edit it
   SCHEDULED // has a time and waits for the worker; only an owner or a manager schedules
@@ -139,6 +143,9 @@ model Post {
   scheduledAt DateTime?
   publishedAt DateTime? // set by the worker when it's out on every platform
   failReason  String? // why the worker gave up (Meta's own words); cleared when it's scheduled again
+  approval     Approval  @default(NONE)
+  approvalNote String? // the client's words when asking for changes
+  approvalAt   DateTime? // when the client answered
   brandId     String
   brand       Brand      @relation(fields: [brandId], references: [id], onDelete: Cascade)
   // Who wrote it. Removing a staff member keeps their posts (the brand's history), just unsigned.
@@ -209,6 +216,27 @@ model SocialAccount {
   updatedAt         DateTime      @updatedAt
 
   @@index([pageId]) // is this page already connected to another brand of the agency?
+}
+
+// The client's answer about one post.
+enum Approval {
+  NONE // not sent to the client (or changed after they approved it)
+  PENDING // sent: waiting for the client
+  APPROVED
+  CHANGES_REQUESTED // the client wants changes (approvalNote says which)
+}
+
+// A link the agency sends a client: <site>/review/<secret>. Whoever has it sees that brand's posts
+// waiting for approval, and answers them - no account. Kept as a hash, like invites.
+model ReviewLink {
+  id        String   @id @default(uuid())
+  brandId   String
+  brand     Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([brandId])
 }
 
 enum PublicationStatus {

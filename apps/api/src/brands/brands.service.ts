@@ -18,6 +18,7 @@ const brandSelect = {
   language: true,
   voice: true,
   timezone: true,
+  requiresApproval: true,
   createdAt: true,
   members: { select: { user: { select: { id: true, name: true } } }, orderBy: { createdAt: "asc" } },
   account: { select: accountSelect }, // its Facebook page and Instagram, or null - never the token

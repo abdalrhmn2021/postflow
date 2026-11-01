@@ -1,11 +1,12 @@
 import { createBrandSchema, isTimeZone, setEditorsSchema, updateBrandSchema } from "./brands.schemas.js";
 
 describe("brand schemas", () => {
-  it("fills in Arabic and Gaza's time zone by default", () => {
+  it("fills in Arabic, Gaza's time zone and no approval step by default", () => {
     expect(createBrandSchema.parse({ name: " برجر هم " })).toEqual({
       name: "برجر هم",
       language: "ar",
       timezone: "Asia/Hebron",
+      requiresApproval: false,
     });
   });
 

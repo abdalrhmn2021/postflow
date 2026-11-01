@@ -6,7 +6,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { PostStatus, Prisma, Role } from "../generated/prisma/client.js";
+import { Approval, PostStatus, Prisma, Role } from "../generated/prisma/client.js";
 import type { SessionUser } from "../auth/auth.service.js";
 import { BrandsService, visibleBrands } from "../brands/brands.service.js";
 import { PrismaService } from "../prisma/prisma.service.js";
@@ -32,6 +32,8 @@ const published = () =>
   new ConflictException({ code: "POST_PUBLISHED", message: "This post is already published and can't be changed" });
 const publishing = () =>
   new ConflictException({ code: "POST_PUBLISHING", message: "This post is being published right now" });
+const alreadyScheduled = () =>
+  new ConflictException({ code: "POST_SCHEDULED", message: "Unschedule the post before sending it for approval" });
 const editorsDraftOnly = () =>
   new ForbiddenException({ code: "FORBIDDEN", message: "Only a manager or the owner can change a scheduled post" });
 // Someone else (or the worker) changed the post between our read and our write.
@@ -73,9 +75,13 @@ const postSelect = {
       id: true,
       name: true,
       timezone: true,
+      requiresApproval: true, // the client approves each post before it's scheduled
       account: { select: { status: true, instagramId: true } },
     },
   },
+  approval: true,
+  approvalNote: true,
+  approvalAt: true,
   createdBy: { select: { id: true, name: true } }, // null once that staff member is removed
   failReason: true, // FAILED: why, in Meta's words
   publications: { select: { platform: true, status: true, url: true, error: true } }, // per platform
@@ -99,6 +105,12 @@ type PostRow = Prisma.PostGetPayload<{ select: typeof postSelect }>;
 // The posts a user may see: the posts of the brands they may see. One rule for the whole app.
 function visiblePosts(user: SessionUser): Prisma.PostWhereInput {
   return { brand: visibleBrands(user) };
+}
+
+// The post's text, platforms or files changed: an approval no longer covers it. Waiting (PENDING) or
+// "changes requested" stay as they are - the client will see the new version on the link.
+function approvalAfterChange(post: PostRow): { approval?: Approval; approvalAt?: null } {
+  return post.approval === Approval.APPROVED ? { approval: Approval.NONE, approvalAt: null } : {};
 }
 
 function isPrismaError(err: unknown, code: string) {
@@ -130,16 +142,17 @@ export class PostsService {
 
   // What still stops this post (as it will be after a change) from being scheduled. {} = ready.
   // Checks the brand's connected accounts too, once Meta is set up on this server.
-  private problems(post: PostRow, after: Partial<Schedulable> = {}) {
+  private problems(post: PostRow, after: Partial<Schedulable> & { approvalState?: Approval } = {}) {
     const connected = connectedPlatforms(post.brand.account, this.meta.configured);
-    return problemsBeforeScheduling({ ...post, connected, ...after });
+    const approval = { required: post.brand.requiresApproval, state: after.approvalState ?? post.approval };
+    return problemsBeforeScheduling({ ...post, connected, approval, ...after });
   }
 
   // The status a post has after a change (to its text, time, platforms or files):
   //   scheduled -> stays scheduled, so it must still be ready afterwards (else 400 POST_NOT_READY)
   //   failed    -> a draft again: someone is fixing it; then it's scheduled again
   //   draft     -> a draft
-  private statusAfterChange(post: PostRow, after: Partial<Schedulable>) {
+  private statusAfterChange(post: PostRow, after: Partial<Schedulable> & { approvalState?: Approval }) {
     if (post.status === PostStatus.SCHEDULED) {
       const problems = this.problems(post, after);
       if (Object.keys(problems).length > 0) throw notReady(problems);
@@ -184,8 +197,13 @@ export class PostsService {
   async update(user: SessionUser, id: string, input: UpdatePostInput) {
     const post = await this.get(user, id);
     assertCanChange(user, post);
-    const status = this.statusAfterChange(post, input);
-    const updated = await this.write(post, { ...input, status });
+    // A new text or new platforms: what the client approved isn't what will go out any more.
+    const contentChanged =
+      (input.caption !== undefined && input.caption !== post.caption) ||
+      (input.platforms !== undefined && input.platforms.join() !== post.platforms.join());
+    const approval = contentChanged ? approvalAfterChange(post) : {};
+    const status = this.statusAfterChange(post, { ...input, approvalState: approval.approval });
+    const updated = await this.write(post, { ...input, ...approval, status });
     // A scheduled post moved to another time: its job moves too. (A job left behind would find a
     // different time on the post and do nothing - removing it just keeps the queue tidy.)
     if (status === PostStatus.SCHEDULED && updated.scheduledAt?.getTime() !== post.scheduledAt?.getTime()) {
@@ -230,6 +248,18 @@ export class PostsService {
     await this.storage.remove(post.media); // the rows went with the post (cascade); now the files
   }
 
+  // ---- The client's approval ------------------------------------------------------------------
+  // POST /posts/:id/approval -> PENDING: the post shows on the brand's review link until the client
+  // answers. Anyone who can change the post may send it (editors too). Again after "changes" is fine.
+  async requestApproval(user: SessionUser, id: string) {
+    const post = await this.get(user, id);
+    assertCanChange(user, post);
+    if (post.status !== PostStatus.DRAFT && post.status !== PostStatus.FAILED) throw alreadyScheduled();
+    if (!post.caption.trim() && post.media.length === 0) throw notReady({ caption: "Write the post first" });
+    if (post.approval === Approval.PENDING) return post;
+    return this.write(post, { approval: Approval.PENDING, approvalNote: null, approvalAt: null });
+  }
+
   // ---- Files (images and videos) --------------------------------------------------------------
   // Uploading is two calls, so a big video never passes through this server:
   //   1. POST /posts/:id/media/upload -> a signed ticket for ONE new file name of this brand
@@ -264,10 +294,12 @@ export class PostsService {
       throw badFile(problem);
     }
 
-    const status = this.statusAfterChange(post, { media: [...post.media, file] });
+    const approval = approvalAfterChange(post);
+    const status = this.statusAfterChange(post, { media: [...post.media, file], approvalState: approval.approval });
     const { publicId: name, url, format, width, height, bytes, duration } = file;
     try {
       return await this.write(post, {
+        ...approval,
         status,
         media: {
           create: { type, publicId: name, url, format, width, height, bytes, duration, position: post.media.length },
@@ -287,8 +319,10 @@ export class PostsService {
     if (ids.length !== byId.size || !ids.every((mid) => byId.has(mid))) throw wrongOrder();
 
     const media = ids.map((mid) => byId.get(mid)!);
-    const status = this.statusAfterChange(post, { media });
+    const approval = approvalAfterChange(post);
+    const status = this.statusAfterChange(post, { media, approvalState: approval.approval });
     return this.write(post, {
+      ...approval,
       status,
       media: { update: ids.map((mid, position) => ({ where: { id: mid }, data: { position } })) },
     });
@@ -302,8 +336,10 @@ export class PostsService {
 
     const rest = post.media.filter((m) => m.id !== mediaId);
     // A scheduled Instagram post can't lose its last image - unschedule it first.
-    const status = this.statusAfterChange(post, { media: rest });
+    const approval = approvalAfterChange(post);
+    const status = this.statusAfterChange(post, { media: rest, approvalState: approval.approval });
     const updated = await this.write(post, {
+      ...approval,
       status,
       media: {
         delete: { id: mediaId },

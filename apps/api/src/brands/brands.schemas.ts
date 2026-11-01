@@ -22,16 +22,20 @@ const voice = z
   .nullable();
 const timezone = z.string().trim().refine(isTimeZone, "Unknown time zone");
 
+// The client approves each post before it can be scheduled (a review link, phase 5).
+const requiresApproval = z.boolean("Must be true or false");
+
 export const createBrandSchema = z.object({
   name,
   language: language.default("ar"),
   voice: voice.optional(),
   timezone: timezone.default("Asia/Hebron"),
+  requiresApproval: requiresApproval.default(false),
 });
 
 // Every field optional: send only what changes.
 export const updateBrandSchema = z
-  .object({ name, language, voice, timezone })
+  .object({ name, language, voice, timezone, requiresApproval })
   .partial()
   .refine((v) => Object.keys(v).length > 0, "Nothing to change");
 

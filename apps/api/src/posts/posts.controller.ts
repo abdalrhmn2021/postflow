@@ -87,6 +87,14 @@ export class PostsController {
     return this.posts.remove(user, id);
   }
 
+  // POST /api/posts/:id/approval -> the post, waiting for the client (shown on the brand's review link)
+  //   | 409 POST_SCHEDULED | 400 POST_NOT_READY (nothing written yet)
+  @Post(":id/approval")
+  @HttpCode(200)
+  requestApproval(@CurrentUser() user: SessionUser, @Param("id") id: string) {
+    return this.posts.requestApproval(user, id);
+  }
+
   // Files. Same rule as changing the post: an editor only on a draft, nobody on a published post.
   // Each answers with the whole post, so the editor just shows what comes back.
 

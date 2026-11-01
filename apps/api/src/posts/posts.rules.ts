@@ -1,4 +1,4 @@
-import { MediaType, Platform } from "../generated/prisma/client.js";
+import { Approval, MediaType, Platform } from "../generated/prisma/client.js";
 import type { Connected } from "../meta/account.js";
 
 // The platforms' own limits. Meta refuses a post past them, so we say so before scheduling,
@@ -27,6 +27,7 @@ type Schedulable = {
   scheduledAt: Date | null;
   media: MediaFacts[];
   connected?: Connected; // the brand's connected accounts; undefined = not checked (Meta not set up)
+  approval?: { required: boolean; state: Approval }; // the client's approval; undefined = not checked
 };
 
 // What still stops a post from being scheduled, one message per field - the same shape as a
@@ -58,6 +59,10 @@ export function problemsBeforeScheduling(post: Schedulable, now = new Date()): R
 
   const media = mediaProblem(post.platforms, post.media);
   if (media) problems.media = media;
+
+  if (post.approval?.required && post.approval.state !== Approval.APPROVED) {
+    problems.approval = "The client hasn't approved this post";
+  }
   return problems;
 }
 

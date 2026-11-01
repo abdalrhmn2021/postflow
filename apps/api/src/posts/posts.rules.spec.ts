@@ -1,4 +1,4 @@
-import { MediaType, Platform } from "../generated/prisma/client.js";
+import { Approval, MediaType, Platform } from "../generated/prisma/client.js";
 import { countHashtags, problemsBeforeScheduling } from "./posts.rules.js";
 
 const NOW = new Date("2026-11-01T10:00:00Z");
@@ -40,6 +40,18 @@ describe("problemsBeforeScheduling", () => {
     const insta = { ...ready, platforms: [Platform.FACEBOOK, Platform.INSTAGRAM], media: [SQUARE] };
     expect(problemsBeforeScheduling({ ...insta, caption: tags(30) }, NOW)).toEqual({});
     expect(problemsBeforeScheduling({ ...insta, caption: tags(31) }, NOW).caption).toMatch(/30 hashtags/);
+  });
+});
+
+describe("problemsBeforeScheduling - the client's approval", () => {
+  it("only for a brand that asks for it, and only APPROVED will do", () => {
+    const check = (required: boolean, state: Approval) =>
+      problemsBeforeScheduling({ ...ready, approval: { required, state } }, NOW).approval;
+    expect(check(false, Approval.NONE)).toBeUndefined();
+    expect(check(true, Approval.APPROVED)).toBeUndefined();
+    for (const state of [Approval.NONE, Approval.PENDING, Approval.CHANGES_REQUESTED]) {
+      expect(check(true, state)).toBe("The client hasn't approved this post");
+    }
   });
 });
 
