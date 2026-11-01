@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { MediaThumb } from "@/components/MediaThumb";
 import { connection } from "next/server";
 import { Suspense, type ReactNode } from "react";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -256,6 +257,11 @@ function Drafts({
               >
                 <StatusBadge status={post.status} label={t.status[post.status]} />
                 <span className="w-40 shrink-0 truncate font-medium">{post.brand.name}</span>
+                {post.media[0] ? (
+                  <MediaThumb media={post.media[0]} size={32} className="shrink-0 rounded-md" />
+                ) : (
+                  <span className="size-8 shrink-0" />
+                )}
                 <span dir="auto" className="min-w-0 flex-1 truncate text-sm text-muted">
                   {post.caption.trim() || t.noCaption}
                 </span>

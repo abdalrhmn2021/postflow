@@ -65,4 +65,21 @@ export type Post = {
   updatedAt: string;
   brand: { id: string; name: string; timezone: string };
   createdBy: { id: string; name: string } | null; // null once that staff member was removed
+  media: PostMedia[]; // in order: the first is the cover, more than one is a carousel
 };
+
+// One image or video of a post, as the API read it from Cloudinary. url: the original file;
+// lib/media.ts makes thumbnails and previews from it.
+export type PostMedia = {
+  id: string;
+  type: "IMAGE" | "VIDEO";
+  url: string;
+  format: string;
+  width: number;
+  height: number;
+  duration: number | null; // seconds, videos only
+  publicId: string;
+};
+
+// POST /posts/:id/media/upload: send the file to url as multipart form data, with these fields.
+export type UploadTicket = { publicId: string; url: string; fields: Record<string, string> };

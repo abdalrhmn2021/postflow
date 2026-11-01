@@ -30,6 +30,14 @@ const PATTERNS: [RegExp, keyof Dictionary["fields"]][] = [
   [/^Instagram allows at most (\d+) hashtags$/, "instagramHashtags"],
   [/^Must be a date and time$/, "dateTime"],
   [/^Must be FACEBOOK or INSTAGRAM$/, "platform"],
+  // Files (apps/api/src/media/media.rules.ts and posts.rules.ts)
+  [/^Instagram needs an image or a video$/, "needsMedia"],
+  [/^File (\d+): Instagram takes images from 4:5 to 1\.91:1$/, "mediaRatio"],
+  [/^File (\d+): Instagram takes videos of 3 s to 15 min$/, "reelLength"],
+  [/^File (\d+): a video in a carousel is at most 60 s$/, "carouselVideo"],
+  [/^Facebook takes a video on its own$/, "facebookVideo"],
+  [/^Must be (?:jpg|mp4)/, "fileFormat"],
+  [/^At most (\d+) MB$/, "fileSize"],
 ];
 
 export function fieldText(apiMessage: string | undefined, fields: Dictionary["fields"]): string | undefined {

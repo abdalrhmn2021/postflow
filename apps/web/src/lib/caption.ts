@@ -1,3 +1,6 @@
+import { mediaProblem, type MediaProblem } from "./media";
+import type { Platform, PostMedia } from "./types";
+
 // The platforms' limits on a caption - the same numbers as the API (apps/api/src/posts/posts.rules.ts),
 // so the counter turns red exactly when scheduling would be refused.
 export const INSTAGRAM_CAPTION_MAX = 2_200;
@@ -25,22 +28,34 @@ export function splitHashtags(caption: string): { text: string; tag: boolean }[]
 
 // The same checks the API makes before scheduling (problemsBeforeScheduling in posts.rules.ts),
 // run in the browser first so a new post isn't created half-done just to hear what's missing.
-// Field -> the key of its message in dict.fields. The API still checks; this only saves a round trip.
+// Field -> the key of its message in dict.fields, and the number for its {n}.
+// The API still checks; this only saves a round trip.
 export type ScheduleProblem =
-  "writeFirst" | "pickPlatform" | "pickTime" | "timePassed" | "instagramChars" | "instagramHashtags";
+  "writeFirst" | "pickPlatform" | "pickTime" | "timePassed" | "instagramChars" | "instagramHashtags" | MediaProblem;
+type Field = "caption" | "platforms" | "scheduledAt" | "media";
 
 export function scheduleProblems(
-  post: { caption: string; platforms: string[]; scheduledAt: string | null },
+  post: {
+    caption: string;
+    platforms: Platform[];
+    scheduledAt: string | null;
+    media: Pick<PostMedia, "type" | "width" | "height" | "duration">[];
+  },
   now = new Date(),
-): Partial<Record<"caption" | "platforms" | "scheduledAt", ScheduleProblem>> {
-  const problems: Partial<Record<"caption" | "platforms" | "scheduledAt", ScheduleProblem>> = {};
-  if (!post.caption.trim()) problems.caption = "writeFirst";
-  if (post.platforms.length === 0) problems.platforms = "pickPlatform";
-  if (!post.scheduledAt) problems.scheduledAt = "pickTime";
-  else if (new Date(post.scheduledAt) <= now) problems.scheduledAt = "timePassed";
+): Partial<Record<Field, { key: ScheduleProblem; n: number }>> {
+  const problems: Partial<Record<Field, { key: ScheduleProblem; n: number }>> = {};
+  if (!post.caption.trim()) problems.caption = { key: "writeFirst", n: 0 };
+  if (post.platforms.length === 0) problems.platforms = { key: "pickPlatform", n: 0 };
+  if (!post.scheduledAt) problems.scheduledAt = { key: "pickTime", n: 0 };
+  else if (new Date(post.scheduledAt) <= now) problems.scheduledAt = { key: "timePassed", n: 0 };
   if (post.platforms.includes("INSTAGRAM")) {
-    if (post.caption.length > INSTAGRAM_CAPTION_MAX) problems.caption ??= "instagramChars";
-    else if (countHashtags(post.caption) > INSTAGRAM_HASHTAGS_MAX) problems.caption ??= "instagramHashtags";
+    if (post.caption.length > INSTAGRAM_CAPTION_MAX) {
+      problems.caption ??= { key: "instagramChars", n: INSTAGRAM_CAPTION_MAX };
+    } else if (countHashtags(post.caption) > INSTAGRAM_HASHTAGS_MAX) {
+      problems.caption ??= { key: "instagramHashtags", n: INSTAGRAM_HASHTAGS_MAX };
+    }
   }
+  const media = mediaProblem(post.platforms, post.media);
+  if (media) problems.media = media;
   return problems;
 }

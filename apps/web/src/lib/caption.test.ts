@@ -16,21 +16,31 @@ describe("caption", () => {
   });
 
   it("finds the same problems as the API before scheduling", () => {
-    expect(scheduleProblems({ caption: " ", platforms: [], scheduledAt: null }, NOW)).toEqual({
-      caption: "writeFirst",
-      platforms: "pickPlatform",
-      scheduledAt: "pickTime",
-    });
-    expect(scheduleProblems({ caption: "x", platforms: ["FACEBOOK"], scheduledAt: NOW.toISOString() }, NOW)).toEqual({
-      scheduledAt: "timePassed",
-    });
-    const tags = Array.from({ length: 31 }, (_, i) => `#t${i}`).join(" ");
-    expect(scheduleProblems({ caption: tags, platforms: ["FACEBOOK"], scheduledAt: LATER }, NOW)).toEqual({});
-    expect(scheduleProblems({ caption: tags, platforms: ["INSTAGRAM"], scheduledAt: LATER }, NOW)).toEqual({
-      caption: "instagramHashtags",
+    const none = { media: [] };
+    expect(scheduleProblems({ caption: " ", platforms: [], scheduledAt: null, ...none }, NOW)).toEqual({
+      caption: { key: "writeFirst", n: 0 },
+      platforms: { key: "pickPlatform", n: 0 },
+      scheduledAt: { key: "pickTime", n: 0 },
     });
     expect(
-      scheduleProblems({ caption: "ا".repeat(2201), platforms: ["INSTAGRAM"], scheduledAt: LATER }, NOW).caption,
-    ).toBe("instagramChars");
+      scheduleProblems({ caption: "x", platforms: ["FACEBOOK"], scheduledAt: NOW.toISOString(), ...none }, NOW),
+    ).toEqual({ scheduledAt: { key: "timePassed", n: 0 } });
+
+    const tags = Array.from({ length: 31 }, (_, i) => `#t${i}`).join(" ");
+    const square = { media: [{ type: "IMAGE" as const, width: 1080, height: 1080, duration: null }] };
+    expect(scheduleProblems({ caption: tags, platforms: ["FACEBOOK"], scheduledAt: LATER, ...none }, NOW)).toEqual({});
+    expect(scheduleProblems({ caption: tags, platforms: ["INSTAGRAM"], scheduledAt: LATER, ...square }, NOW)).toEqual({
+      caption: { key: "instagramHashtags", n: 30 },
+    });
+    expect(
+      scheduleProblems({ caption: "ا".repeat(2201), platforms: ["INSTAGRAM"], scheduledAt: LATER, ...square }, NOW)
+        .caption,
+    ).toEqual({ key: "instagramChars", n: 2200 });
+  });
+
+  it("Instagram with no file: the problem is under media", () => {
+    expect(scheduleProblems({ caption: "x", platforms: ["INSTAGRAM"], scheduledAt: LATER, media: [] }, NOW)).toEqual({
+      media: { key: "needsMedia", n: 0 },
+    });
   });
 });

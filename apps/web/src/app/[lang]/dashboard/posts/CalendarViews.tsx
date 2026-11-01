@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MediaThumb } from "@/components/MediaThumb";
 import { StatusBadge, statusDots, statusMarks } from "@/components/StatusBadge";
 import type { Locale } from "@/i18n/config";
 import type { Dictionary } from "@/i18n/dictionaries/ar";
@@ -142,8 +143,11 @@ export function WeekView({ locale, t, days, byDay, today, postHref, newHref }: S
                       <StatusBadge status={post.status} label={t.status[post.status]} />
                     </span>
                     <span className="truncate font-medium">{post.brand.name}</span>
-                    <span dir="auto" className="line-clamp-3 text-xs break-words text-muted">
-                      {post.caption.trim() || t.noCaption}
+                    <span className="flex items-start gap-2">
+                      {post.media[0] && <MediaThumb media={post.media[0]} size={40} className="shrink-0 rounded-md" />}
+                      <span dir="auto" className="line-clamp-3 min-w-0 text-xs break-words text-muted">
+                        {post.caption.trim() || t.noCaption}
+                      </span>
                     </span>
                     <span className="flex flex-wrap gap-1 text-[11px] text-muted">
                       {post.platforms.map((p) => (

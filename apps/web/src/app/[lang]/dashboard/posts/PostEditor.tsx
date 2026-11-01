@@ -14,6 +14,7 @@ import { countHashtags, INSTAGRAM_CAPTION_MAX, INSTAGRAM_HASHTAGS_MAX, scheduleP
 import { errorText, fieldErrors } from "@/lib/errors";
 import type { Platform, Post, Role } from "@/lib/types";
 import { formatInZone, fromZonedInput, toZonedInput } from "@/lib/zoned-time";
+import { MediaPicker } from "./MediaPicker";
 import { PostPreview } from "./PostPreview";
 import { StatusBadge } from "@/components/StatusBadge";
 
@@ -65,12 +66,14 @@ export function PostEditor({ locale, t, errors, fields, role, brands, post, init
   );
 
   const [busy, setBusy] = useState<Action | null>(null);
+  const [uploading, setUploading] = useState(false); // files on their way: hold save and schedule
   const [notice, setNotice] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [fieldError, setFieldError] = useState<Record<string, string>>({});
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const status = current?.status ?? "DRAFT";
+  const media = current?.media ?? []; // the files are saved one by one as they're added, not with the form
   const canManage = role !== "EDITOR";
   const readOnly = status === "PUBLISHED" || (!canManage && status !== "DRAFT");
   const scheduledAt = when && brand ? fromZonedInput(when, brand.timezone) : null;
@@ -121,6 +124,20 @@ export function PostEditor({ locale, t, errors, fields, role, brands, post, init
     return created;
   }
 
+  // The post files are uploaded to. A new post is saved as a draft first (files need a post).
+  async function ensurePost(): Promise<Post> {
+    if (current) return current;
+    const created = await save();
+    setCurrent(created);
+    return created;
+  }
+
+  // The files changed (added, moved, removed): the API answers with the whole post.
+  function onMediaChange(post: Post) {
+    edited("media");
+    setCurrent(post);
+  }
+
   async function run(action: Action, work: () => Promise<Post | void>, done?: string) {
     setBusy(action);
     setNotice(null);
@@ -146,19 +163,13 @@ export function PostEditor({ locale, t, errors, fields, role, brands, post, init
   // If scheduling is refused (POST_NOT_READY), the post stays saved as a draft and the reasons
   // show under the fields.
   function schedule() {
-    const problems = scheduleProblems({ caption, platforms, scheduledAt });
+    const problems = scheduleProblems({ caption, platforms, scheduledAt, media });
     if (Object.keys(problems).length > 0) {
       setNotice(null);
       setFormError(errors.POST_NOT_READY);
       setFieldError(
         Object.fromEntries(
-          Object.entries(problems).map(([field, key]) => [
-            field,
-            fields[key].replace(
-              "{n}",
-              key === "instagramChars" ? String(INSTAGRAM_CAPTION_MAX) : String(INSTAGRAM_HASHTAGS_MAX),
-            ),
-          ]),
+          Object.entries(problems).map(([field, { key, n }]) => [field, fields[key].replace("{n}", String(n))]),
         ),
       );
       return;
@@ -284,6 +295,21 @@ export function PostEditor({ locale, t, errors, fields, role, brands, post, init
             {fieldError.platforms && <p className="text-sm text-bad">{fieldError.platforms}</p>}
           </fieldset>
 
+          <MediaPicker
+            t={t}
+            errors={errors}
+            fields={fields}
+            postId={current?.id}
+            media={media}
+            platforms={platforms}
+            readOnly={readOnly}
+            disabled={busy !== null || !brand}
+            error={fieldError.media}
+            ensurePost={ensurePost}
+            onPost={onMediaChange}
+            onBusy={setUploading}
+          />
+
           <div className="flex flex-col gap-1.5">
             <Input
               name="scheduledAt"
@@ -320,13 +346,13 @@ export function PostEditor({ locale, t, errors, fields, role, brands, post, init
             <div className="flex flex-wrap items-center gap-3 border-t border-line pt-5">
               {status === "SCHEDULED" ? (
                 <>
-                  <Button type="submit" loading={busy === "save"} disabled={busy !== null}>
+                  <Button type="submit" loading={busy === "save"} disabled={busy !== null || uploading}>
                     {t.save}
                   </Button>
                   <Button
                     variant="secondary"
                     loading={busy === "unschedule"}
-                    disabled={busy !== null}
+                    disabled={busy !== null || uploading}
                     onClick={unschedule}
                   >
                     {t.unschedule}
@@ -338,12 +364,16 @@ export function PostEditor({ locale, t, errors, fields, role, brands, post, init
                     type="submit"
                     variant={canManage ? "secondary" : "primary"}
                     loading={busy === "save"}
-                    disabled={busy !== null || !brand}
+                    disabled={busy !== null || uploading || !brand}
                   >
                     {t.saveDraft}
                   </Button>
                   {canManage ? (
-                    <Button loading={busy === "schedule"} disabled={busy !== null || !brand} onClick={schedule}>
+                    <Button
+                      loading={busy === "schedule"}
+                      disabled={busy !== null || uploading || !brand}
+                      onClick={schedule}
+                    >
                       {t.schedule}
                     </Button>
                   ) : (
@@ -370,6 +400,7 @@ export function PostEditor({ locale, t, errors, fields, role, brands, post, init
             caption={caption}
             platforms={platforms}
             scheduledAt={scheduledAt}
+            media={media}
           />
         </aside>
       </div>
@@ -381,7 +412,7 @@ export function PostEditor({ locale, t, errors, fields, role, brands, post, init
               variant="danger"
               className="self-start"
               onClick={() => setConfirmDelete(true)}
-              disabled={busy !== null}
+              disabled={busy !== null || uploading}
             >
               {t.delete}
             </Button>

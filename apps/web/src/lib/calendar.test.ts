@@ -28,6 +28,7 @@ function post(id: string, scheduledAt: string, timezone = "Asia/Hebron"): Post {
     updatedAt: scheduledAt,
     brand: { id: "b", name: "B", timezone },
     createdBy: null,
+    media: [],
   };
 }
 
