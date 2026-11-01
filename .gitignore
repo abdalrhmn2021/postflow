@@ -14,3 +14,6 @@ next-env.d.ts
 apps/api/src/generated/
 
 .DS_Store
+
+# Redis snapshot (a local redis-server writes it where it was started)
+dump.rdb
