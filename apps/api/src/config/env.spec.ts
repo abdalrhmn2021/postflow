@@ -47,7 +47,7 @@ describe("validateEnv", () => {
     expect(() => validateEnv({ ...base, CLOUDINARY_URL: "https://cloudinary.com/x" })).toThrow(/CLOUDINARY_URL/);
   });
 
-  it("Meta: both keys or neither; required in production", () => {
+  it("Meta: both keys or neither", () => {
     expect(validateEnv(base).META).toBeUndefined();
     expect(validateEnv({ ...base, META_APP_ID: "1234567890", META_APP_SECRET: "0123456789abcdef0123" }).META).toEqual({
       appId: "1234567890",
@@ -55,8 +55,9 @@ describe("validateEnv", () => {
       graphVersion: "v24.0",
     });
     expect(() => validateEnv({ ...base, META_APP_ID: "1234567890" })).toThrow(/set both, or neither/);
+    // Production may start without Meta (the site goes online before the Meta app exists).
     const prod = { ...base, NODE_ENV: "production", JWT_SECRET: "x".repeat(32), TOKEN_ENCRYPTION_KEY: KEY };
-    expect(() => validateEnv(prod)).toThrow(/META_APP_ID and META_APP_SECRET: required in production/);
+    expect(validateEnv(prod).META).toBeUndefined();
   });
 
   it("TOKEN_ENCRYPTION_KEY: 32 bytes; a dev key in development, required in production", () => {
@@ -66,6 +67,12 @@ describe("validateEnv", () => {
     expect(() => validateEnv({ ...base, NODE_ENV: "production", JWT_SECRET: "x".repeat(32) })).toThrow(
       /TOKEN_ENCRYPTION_KEY: required in production/,
     );
+  });
+
+  it("RUN_WORKER: off unless it's exactly true", () => {
+    expect(validateEnv(base).RUN_WORKER).toBe(false);
+    expect(validateEnv({ ...base, RUN_WORKER: "true" }).RUN_WORKER).toBe(true);
+    expect(() => validateEnv({ ...base, RUN_WORKER: "yes" })).toThrow(/RUN_WORKER/);
   });
 
   it("reads TRUST_PROXY as a hop count when it is a number", () => {

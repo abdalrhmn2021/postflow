@@ -2,7 +2,9 @@
 
 **Social media scheduling for agencies.** An agency plans its clients' posts on one calendar, the client approves them from a link, and each post goes out on Facebook and Instagram at its time - automatically. Captions are drafted by AI in the brand's own voice.
 
-> Status: **phase 6 (AI captions)** - done. "Write me a caption" in the post editor: the idea in a few words -> three really different captions in the client's language and voice (from the client's settings), hashtags cleaned and after the text, within Instagram's limits; "improve the text I wrote" sends the draft too. Google Gemini through its REST API in JSON mode; the agency's words go to the model as quoted data, not instructions; at most 30 requests per person per hour. Nothing is saved until the person picks one.
+> Status: **phase 7 (launch)** - ready to deploy: browser tests (Playwright: sign-up, login, language, a post to the calendar, the client's approval) in CI; `RUN_WORKER=true` runs the publish worker inside the API (one free service); `/api/health/ping` for an uptime pinger that doesn't wake the database; `render.yaml` and [DEPLOY.md](DEPLOY.md) for Vercel + Render.
+>
+> **Phase 6 (AI captions)** - done. "Write me a caption" in the post editor: the idea in a few words -> three really different captions in the client's language and voice (from the client's settings), hashtags cleaned and after the text, within Instagram's limits; "improve the text I wrote" sends the draft too. Google Gemini through its REST API in JSON mode; the agency's words go to the model as quoted data, not instructions; at most 30 requests per person per hour. Nothing is saved until the person picks one.
 >
 > **Phase 5 (client approval)** - done. A client can require approval (a setting on the client): then only posts the client approved can be scheduled. A draft is sent for approval (editors too); the owner or a manager makes a review link (14 days, kept as a hash) and sends it - copy or WhatsApp. The client opens it with no account, sees each post as it will look on Facebook and Instagram, and approves or asks for changes with a note, which the agency sees in the editor. Changing an approved post's text, platforms or files needs a new approval; a link reaches its own client only and can be stopped.
 >
@@ -22,7 +24,7 @@
 | API      | NestJS 12, TypeScript                                         |
 | Database | PostgreSQL 17 + Prisma 7                                      |
 | Jobs     | Redis 7 + BullMQ                                              |
-| Tests    | Vitest + Supertest, Playwright (phase 7)                      |
+| Tests    | Vitest + Supertest, Playwright                                |
 | CI       | GitHub Actions                                                |
 
 ## Architecture
@@ -133,6 +135,7 @@ npm run format:check                 # Prettier
 npm run typecheck -w api && npm run lint -w api && npm test -w api
 npm run test:e2e -w api              # needs `npm run db:up`
 npm run typecheck -w web && npm run lint -w web && npm test -w web && npm run build -w web
+npm run build -w api && npm run test:browser -w web   # Playwright: needs the database + Redis running
 ```
 
 CI runs all of them on every push and pull request.

@@ -1,6 +1,7 @@
 import type { INestApplication } from "@nestjs/common";
 import request from "supertest";
 import type { App } from "supertest/types.js";
+import { PrismaService } from "../src/prisma/prisma.service.js";
 import { RedisService } from "../src/redis/redis.service.js";
 import { HEARTBEAT_KEY } from "../src/worker/heartbeat.js";
 import { startApp } from "./app.js";
@@ -10,6 +11,15 @@ describe("GET /api/health", () => {
 
   afterEach(async () => {
     await app?.close();
+  });
+
+  it("ping answers without touching the database (for an uptime pinger)", async () => {
+    app = await startApp();
+    const prisma = app.get(PrismaService);
+    const spy = vi.spyOn(prisma, "$queryRaw");
+    expect((await request(app.getHttpServer()).get("/api/health/ping").expect(200)).body).toEqual({ ok: true });
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
   });
 
   it("is ok when the database and Redis answer", async () => {

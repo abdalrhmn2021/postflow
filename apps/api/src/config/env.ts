@@ -59,7 +59,7 @@ const envSchema = z.object({
 
   // The Meta app (developers.facebook.com -> the app -> App settings -> Basic) that connects clients'
   // Facebook pages and Instagram accounts. Both or neither. Without them connecting is off and posts
-  // can be scheduled without a connected page (development only - required in production).
+  // can be scheduled without a connected page, and fail at their time (a warning at start in production).
   META_APP_ID: z.preprocess(emptyIsUnset, z.string().regex(/^\d+$/, "META_APP_ID is a number").optional()),
   META_APP_SECRET: z.preprocess(emptyIsUnset, z.string().min(16, "META_APP_SECRET looks too short").optional()),
   // The Graph API version every call uses. Meta keeps each version about two years.
@@ -67,6 +67,13 @@ const envSchema = z.object({
     .string()
     .regex(/^v\d+\.\d$/, "META_GRAPH_VERSION looks like v24.0")
     .default("v24.0"),
+
+  // "true": the API process runs the publish worker too - one service instead of two, for a free
+  // host. Leave it off (the default) when the worker runs as its own service (npm run worker).
+  RUN_WORKER: z
+    .enum(["true", "false", ""], "RUN_WORKER is true or false")
+    .default("false")
+    .transform((v) => v === "true"),
 
   // Writes caption ideas (phase 6): a Google AI Studio key (aistudio.google.com -> Get API key).
   // Empty = the "write a caption" button says it isn't set up; everything else works.
@@ -132,8 +139,6 @@ export function validateEnv(raw: Record<string, unknown>): Env {
   if (production && !TOKEN_ENCRYPTION_KEY) problems.push("TOKEN_ENCRYPTION_KEY: required in production");
   if (Boolean(META_APP_ID) !== Boolean(META_APP_SECRET)) {
     problems.push("META_APP_ID and META_APP_SECRET: set both, or neither");
-  } else if (production && !META_APP_ID) {
-    problems.push("META_APP_ID and META_APP_SECRET: required in production");
   }
   if (problems.length > 0) {
     throw new Error(`Invalid environment variables:\n${problems.map((p) => `  - ${p}`).join("\n")}\nSee .env.example.`);

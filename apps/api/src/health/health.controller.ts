@@ -47,6 +47,13 @@ export class HealthController {
     private readonly redis: RedisService,
   ) {}
 
+  // GET /api/health/ping -> { ok: true }, touching nothing. For an uptime pinger that keeps a free
+  // host awake: it must not wake the database every few minutes (Neon's free plan counts that time).
+  @Get("ping")
+  ping() {
+    return { ok: true };
+  }
+
   @Get()
   async check() {
     const [database, redis] = await Promise.all([

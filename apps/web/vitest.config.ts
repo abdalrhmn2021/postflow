@@ -1,7 +1,7 @@
 import { defineConfig } from "vitest/config";
 
 // Unit tests for the website's plain logic (time zones, the calendar grid, caption counters).
-// Pages and components are checked by typecheck, lint and build; the browser flows come in phase 7.
+// Pages and components are checked by typecheck, lint and build; the browser flows by Playwright (e2e/).
 export default defineConfig({
   resolve: { tsconfigPaths: true }, // "@/lib/..." like the app
   test: {

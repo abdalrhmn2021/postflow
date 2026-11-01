@@ -2,6 +2,7 @@
 #   format - Prettier, whole repo
 #   web    - Next.js: route types + TypeScript, ESLint, production build
 #   api    - NestJS: TypeScript, oxlint, unit tests, build, e2e tests on a real PostgreSQL + Redis
+#   browser - Playwright: the built site and API, clicked through in Chromium
 name: CI
 
 on:
@@ -80,3 +81,50 @@ jobs:
       - run: npm run build -w api
       - run: npm run db:deploy -w api # apply the migrations to the empty test database
       - run: npm run test:e2e -w api
+
+  browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postflow
+          POSTGRES_PASSWORD: postflow
+          POSTGRES_DB: postflow_browser
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postflow -d postflow_browser"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postflow:postflow@localhost:5432/postflow_browser
+      REDIS_URL: redis://localhost:6379
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run db:deploy -w api
+      - run: npm run build -w api
+      - run: npm run build -w web
+      - run: npx playwright install --with-deps chromium
+        working-directory: apps/web
+      - run: npm run test:browser -w web
+      # A failed run keeps its recordings: Actions -> this run -> Artifacts -> playwright-report.
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            apps/web/playwright-report
+            apps/web/test-results
+          retention-days: 7

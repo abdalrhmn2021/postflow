@@ -1,0 +1,42 @@
+# Render blueprint: the API (with the publish worker inside it) as one web service.
+# Render -> New -> Blueprint -> this repo. Fill the "sync: false" values in Render's form
+# (they are secrets: never in git). See DEPLOY.md for the whole setup.
+services:
+  - type: web
+    name: postflow-api
+    runtime: node
+    plan: free # upgrade: "starter" (always awake), then RUN_WORKER=false + a separate worker service
+    region: frankfurt # next to the Neon database (Frankfurt)
+    # --include=dev: NODE_ENV=production would make npm skip the build tools (TypeScript, Nest, Prisma).
+    buildCommand: npm ci --include=dev && npm run build -w api
+    # Migrations run at each start: a new version never runs against an old database.
+    startCommand: npm run db:deploy -w api && npm run start:prod -w api
+    healthCheckPath: /api/health/ping
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "24" # ships npm 11 (npm 10 can't install this workspace layout)
+      - key: NODE_ENV
+        value: production
+      - key: RUN_WORKER
+        value: "true" # one free service runs both; keep it awake with an uptime pinger (DEPLOY.md)
+      - key: TRUST_PROXY
+        value: "2" # visitor -> Vercel (the site) -> Render's proxy -> the API
+      - key: WEB_ORIGIN
+        sync: false # https://<your-site>.vercel.app
+      - key: DATABASE_URL
+        sync: false # Neon (a new "production" branch or project, not the development one)
+      - key: REDIS_URL
+        sync: false # Upstash (rediss://...)
+      - key: JWT_SECRET
+        generateValue: true
+      - key: TOKEN_ENCRYPTION_KEY
+        sync: false # node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+      - key: CLOUDINARY_URL
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: META_APP_ID
+        sync: false # later, with the Meta app
+      - key: META_APP_SECRET
+        sync: false
