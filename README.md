@@ -2,7 +2,9 @@
 
 **Social media scheduling for agencies.** An agency plans its clients' posts on one calendar, the client approves them from a link, and each post goes out on Facebook and Instagram at its time - automatically. Captions are drafted by AI in the brand's own voice.
 
-> Status: **phase 5 (client approval)** - done. A client can require approval (a setting on the client): then only posts the client approved can be scheduled. A draft is sent for approval (editors too); the owner or a manager makes a review link (14 days, kept as a hash) and sends it - copy or WhatsApp. The client opens it with no account, sees each post as it will look on Facebook and Instagram, and approves or asks for changes with a note, which the agency sees in the editor. Changing an approved post's text, platforms or files needs a new approval; a link reaches its own client only and can be stopped.
+> Status: **phase 6 (AI captions)** - done. "Write me a caption" in the post editor: the idea in a few words -> three really different captions in the client's language and voice (from the client's settings), hashtags cleaned and after the text, within Instagram's limits; "improve the text I wrote" sends the draft too. Google Gemini through its REST API in JSON mode; the agency's words go to the model as quoted data, not instructions; at most 30 requests per person per hour. Nothing is saved until the person picks one.
+>
+> **Phase 5 (client approval)** - done. A client can require approval (a setting on the client): then only posts the client approved can be scheduled. A draft is sent for approval (editors too); the owner or a manager makes a review link (14 days, kept as a hash) and sends it - copy or WhatsApp. The client opens it with no account, sees each post as it will look on Facebook and Instagram, and approves or asks for changes with a note, which the agency sees in the editor. Changing an approved post's text, platforms or files needs a new approval; a link reaches its own client only and can be stopped.
 >
 > **Phase 4 (publishing)** - code done, waiting for the Meta app. Scheduling a post puts a delayed job on the publish queue (BullMQ) for its exact time - nothing polls the database. The worker takes it then, locks the post (PUBLISHING), and sends it: Facebook (text, a photo, several photos, a video) and Instagram (an image, a Reel, a carousel), images as JPEG and MOV as MP4 through Cloudinary. Each platform is recorded with its link or Meta's reason; a platform already out is never sent twice. Meta busy -> tried again after 1, 2, 4 minutes; refused for good -> FAILED with the reason; a refused token marks the page "needs connecting again". An hourly sweep re-queues any scheduled post whose job is missing. Website: "Publishing…", the reason a post failed, links to the published post.
 >
@@ -61,6 +63,7 @@ postflow/
 │       │   ├── staff/       the agency's people: /api/staff, change a role, remove someone
 │       │   ├── posts/       /api/posts: the calendar, drafts, scheduling, files; posts.rules.ts = what a post needs before it's scheduled
 │       │   ├── meta/        Facebook login and pages: MetaGraph (what the API needs) and GraphApiMeta; token-cipher.ts
+│       │   ├── ai/          caption ideas: CaptionWriter (the prompt, the cleanup) and GeminiCaptionWriter
 │       │   ├── review/      client approval: review links and the client's answers (public, the link is the key)
 │       │   ├── publish/     the publish queue (PublishQueue: delayed jobs) and PublisherService (one post -> Meta)
 │       │   ├── media/       file storage: MediaStorage (what the API needs) and CloudinaryStorage (signed uploads, details, delete)
@@ -107,6 +110,12 @@ Post files are stored on [Cloudinary](https://cloudinary.com) (free plan: no car
 **Go to API Keys**, copy the **API environment variable** (`cloudinary://<api_key>:<api_secret>@<cloud_name>`) and
 paste it into `CLOUDINARY_URL` in `apps/api/.env`. Without it everything works except uploads. The e2e tests use a fake
 store, so CI needs no account.
+
+### AI captions (Gemini)
+
+Get a key at [aistudio.google.com](https://aistudio.google.com) -> **Get API key** (the free tier is enough) and put it
+in `GEMINI_API_KEY`. Without it the "write me a caption" button says it isn't set up. `GEMINI_MODEL` defaults to
+`gemini-flash-latest`, Google's newest Flash model.
 
 ### Facebook and Instagram (Meta app)
 

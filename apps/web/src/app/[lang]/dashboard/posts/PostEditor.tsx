@@ -15,6 +15,7 @@ import { errorText, fieldErrors } from "@/lib/errors";
 import type { Connected, Platform, Post, Role } from "@/lib/types";
 import { formatInZone, fromZonedInput, toZonedInput } from "@/lib/zoned-time";
 import { ApprovalBar } from "./ApprovalBar";
+import { CaptionAssistant } from "./CaptionAssistant";
 import { MediaPicker } from "./MediaPicker";
 import { PublishOutcome } from "./PublishOutcome";
 import { PostPreview } from "./PostPreview";
@@ -33,6 +34,7 @@ type Props = {
   locale: Locale;
   t: Dictionary["posts"];
   approvalT: Dictionary["approval"];
+  aiT: Dictionary["ai"];
   errors: Dictionary["errors"];
   fields: Dictionary["fields"];
   role: Role;
@@ -66,6 +68,7 @@ export function PostEditor({
   locale,
   t,
   approvalT,
+  aiT,
   errors,
   fields,
   role,
@@ -317,6 +320,20 @@ export function PostEditor({
               </span>
               {(tooLong || tooManyTags) && <span className="text-bad">{t.instagramLimits}</span>}
             </p>
+            {!readOnly && brand && (
+              <CaptionAssistant
+                t={aiT}
+                errors={errors}
+                fields={fields}
+                brandId={brand.id}
+                platforms={platforms}
+                caption={caption}
+                onUse={(text) => {
+                  edited("caption");
+                  setCaption(text);
+                }}
+              />
+            )}
           </div>
 
           <fieldset className="flex flex-col gap-1.5">

@@ -47,6 +47,7 @@ async function EditPost({
   return (
     <PostEditor
       approvalT={dict.approval}
+      aiT={dict.ai}
       // A new key per post: opening another post starts the editor afresh.
       key={post.id}
       locale={locale}
