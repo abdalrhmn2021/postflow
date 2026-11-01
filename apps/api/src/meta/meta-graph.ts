@@ -7,6 +7,12 @@ export type MetaPage = {
   instagram: { id: string; username: string | null; picture: string | null } | null;
 };
 
+// One file of a post, as Meta will fetch it: a public URL in a format it takes (JPEG / MP4).
+export type PublishMedia = { type: "IMAGE" | "VIDEO"; url: string };
+export type PublishInput = { caption: string; media: PublishMedia[] };
+// Meta's id of the published post, and a link to see it (null when Meta gives none).
+export type Published = { id: string; url: string | null };
+
 // What the API needs from Meta's Graph API. The app uses GraphApiMeta (graph-api.meta.ts);
 // the e2e tests swap in a fake, so CI needs no Meta app and no network.
 export abstract class MetaGraph {
@@ -26,6 +32,13 @@ export abstract class MetaGraph {
   // Does the stored page token still work? The page as Meta sees it now (its name and picture may
   // have changed, an Instagram account may have been linked), or null when Meta refuses the token.
   abstract checkPage(pageId: string, pageToken: string): Promise<Omit<MetaPage, "token"> | null>;
+
+  // Publishing (the worker, phase 4). Throw MetaApiError when Meta refuses; its `retryable`
+  // says whether trying again later can help (Meta busy, rate limit) or not (a bad file, no permission).
+  //   Facebook: text only, one photo, several photos (one post), or one video
+  //   Instagram: one image, one video (a Reel), or a carousel - through the page's token
+  abstract publishToFacebook(pageId: string, pageToken: string, post: PublishInput): Promise<Published>;
+  abstract publishToInstagram(instagramId: string, pageToken: string, post: PublishInput): Promise<Published>;
 }
 
 // The permissions asked for at login. Each one is reviewed by Meta before other agencies can use the app.

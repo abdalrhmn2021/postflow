@@ -117,11 +117,12 @@ enum Platform {
   INSTAGRAM
 }
 
-// A post's life:  DRAFT -> SCHEDULED -> PUBLISHED, or FAILED if Meta says no (phase 4).
+// A post's life:  DRAFT -> SCHEDULED -> PUBLISHING -> PUBLISHED, or FAILED if Meta says no.
 // Phase 5 adds the client's approval between DRAFT and SCHEDULED.
 enum PostStatus {
   DRAFT // being written; anyone on the brand can edit it
   SCHEDULED // has a time and waits for the worker; only an owner or a manager schedules
+  PUBLISHING // the worker is sending it to Meta right now - nobody can change it meanwhile
   PUBLISHED // out on the platforms - kept as history, no longer edited
   FAILED // the worker couldn't publish it; can be fixed and scheduled again
 }
@@ -136,7 +137,8 @@ model Post {
   // When to publish, in UTC. The calendar shows it in the brand's time zone (Brand.timezone).
   // A draft may have no time yet; a scheduled post must have one (a CHECK in the migration says so too).
   scheduledAt DateTime?
-  publishedAt DateTime? // set by the worker when it goes out (phase 4)
+  publishedAt DateTime? // set by the worker when it's out on every platform
+  failReason  String? // why the worker gave up (Meta's own words); cleared when it's scheduled again
   brandId     String
   brand       Brand      @relation(fields: [brandId], references: [id], onDelete: Cascade)
   // Who wrote it. Removing a staff member keeps their posts (the brand's history), just unsigned.
@@ -145,7 +147,8 @@ model Post {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
-  media PostMedia[] // images and videos, in the order they appear (a carousel when more than one)
+  media        PostMedia[] // images and videos, in the order they appear (a carousel when more than one)
+  publications Publication[] // what happened on each platform
 
   @@index([brandId, scheduledAt]) // the calendar: one brand's posts between two dates
   @@index([status, scheduledAt]) // the worker (phase 4): scheduled posts whose time has come
@@ -206,4 +209,26 @@ model SocialAccount {
   updatedAt         DateTime      @updatedAt
 
   @@index([pageId]) // is this page already connected to another brand of the agency?
+}
+
+enum PublicationStatus {
+  PUBLISHED
+  FAILED
+}
+
+// A post on ONE platform. A post to Facebook and Instagram has two: if Facebook went out and
+// Instagram failed, publishing again sends only Instagram - the page never gets the post twice.
+model Publication {
+  id         String            @id @default(uuid())
+  postId     String
+  post       Post              @relation(fields: [postId], references: [id], onDelete: Cascade)
+  platform   Platform
+  status     PublicationStatus
+  externalId String? // Meta's id of the published post
+  url        String? // where to see it: facebook.com/... or instagram.com/p/...
+  error      String? // Meta's reason, when it failed
+  attempts   Int               @default(0)
+  updatedAt  DateTime          @updatedAt
+
+  @@unique([postId, platform])
 }

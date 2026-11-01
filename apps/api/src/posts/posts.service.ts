@@ -14,6 +14,7 @@ import { brandMediaPrefix, MediaStorage } from "../media/media-storage.js";
 import { fileProblem, MEDIA_MAX } from "../media/media.rules.js";
 import { connectedPlatforms } from "../meta/account.js";
 import { MetaGraph } from "../meta/meta-graph.js";
+import { PublishQueue } from "../publish/publish.queue.js";
 import { problemsBeforeScheduling } from "./posts.rules.js";
 import type {
   AttachMediaInput,
@@ -29,6 +30,8 @@ import type {
 const notFound = () => new NotFoundException({ code: "POST_NOT_FOUND", message: "Post not found" });
 const published = () =>
   new ConflictException({ code: "POST_PUBLISHED", message: "This post is already published and can't be changed" });
+const publishing = () =>
+  new ConflictException({ code: "POST_PUBLISHING", message: "This post is being published right now" });
 const editorsDraftOnly = () =>
   new ForbiddenException({ code: "FORBIDDEN", message: "Only a manager or the owner can change a scheduled post" });
 // Someone else (or the worker) changed the post between our read and our write.
@@ -74,6 +77,8 @@ const postSelect = {
     },
   },
   createdBy: { select: { id: true, name: true } }, // null once that staff member is removed
+  failReason: true, // FAILED: why, in Meta's words
+  publications: { select: { platform: true, status: true, url: true, error: true } }, // per platform
   media: {
     select: {
       id: true,
@@ -102,10 +107,12 @@ function isPrismaError(err: unknown, code: string) {
 
 // Who may change or delete a post in its current state:
 //   published          -> nobody (it's history)
+//   publishing         -> nobody, until the worker is done (a few seconds, minutes for a video)
 //   scheduled / failed -> the owner and managers
 //   draft              -> anyone who can see it
 function assertCanChange(user: SessionUser, post: PostRow) {
   if (post.status === PostStatus.PUBLISHED) throw published();
+  if (post.status === PostStatus.PUBLISHING) throw publishing();
   if (user.role === Role.EDITOR && post.status !== PostStatus.DRAFT) throw editorsDraftOnly();
 }
 
@@ -118,6 +125,7 @@ export class PostsService {
     private readonly brands: BrandsService,
     private readonly storage: MediaStorage,
     private readonly meta: MetaGraph,
+    private readonly queue: PublishQueue,
   ) {}
 
   // What still stops this post (as it will be after a change) from being scheduled. {} = ready.
@@ -177,26 +185,39 @@ export class PostsService {
     const post = await this.get(user, id);
     assertCanChange(user, post);
     const status = this.statusAfterChange(post, input);
-    return this.write(post, { ...input, status });
+    const updated = await this.write(post, { ...input, status });
+    // A scheduled post moved to another time: its job moves too. (A job left behind would find a
+    // different time on the post and do nothing - removing it just keeps the queue tidy.)
+    if (status === PostStatus.SCHEDULED && updated.scheduledAt?.getTime() !== post.scheduledAt?.getTime()) {
+      await this.queue.remove(post);
+      await this.queue.add({ id: updated.id, scheduledAt: updated.scheduledAt! });
+    }
+    return updated;
   }
 
   // DRAFT or FAILED -> SCHEDULED (owner and managers; the controller checks the role).
   async schedule(user: SessionUser, id: string) {
     const post = await this.get(user, id);
     if (post.status === PostStatus.PUBLISHED) throw published();
+    if (post.status === PostStatus.PUBLISHING) throw publishing();
     if (post.status === PostStatus.SCHEDULED) return post; // already done: asking twice is fine
 
     const problems = this.problems(post);
     if (Object.keys(problems).length > 0) throw notReady(problems);
-    return this.write(post, { status: PostStatus.SCHEDULED });
+    const scheduled = await this.write(post, { status: PostStatus.SCHEDULED, failReason: null });
+    await this.queue.add({ id: scheduled.id, scheduledAt: scheduled.scheduledAt! }); // waits in Redis until its time
+    return scheduled;
   }
 
   // SCHEDULED or FAILED -> DRAFT: take it off the worker's list, keep everything else.
   async unschedule(user: SessionUser, id: string) {
     const post = await this.get(user, id);
     if (post.status === PostStatus.PUBLISHED) throw published();
+    if (post.status === PostStatus.PUBLISHING) throw publishing();
     if (post.status === PostStatus.DRAFT) return post;
-    return this.write(post, { status: PostStatus.DRAFT });
+    const draft = await this.write(post, { status: PostStatus.DRAFT });
+    await this.queue.remove(post);
+    return draft;
   }
 
   async remove(user: SessionUser, id: string) {
@@ -205,6 +226,7 @@ export class PostsService {
     // Same guard as write(): don't delete a post the worker has just started publishing.
     const { count } = await this.prisma.post.deleteMany({ where: { id, status: post.status } });
     if (count === 0) throw changedMeanwhile();
+    await this.queue.remove(post);
     await this.storage.remove(post.media); // the rows went with the post (cascade); now the files
   }
 

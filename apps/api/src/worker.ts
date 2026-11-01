@@ -8,7 +8,7 @@ import { WorkerModule } from "./worker/worker.module.js";
 async function bootstrap() {
   const app = await NestFactory.createApplicationContext(WorkerModule);
   app.enableShutdownHooks();
-  console.log("PostFlow worker running (the publish queue arrives in phase 4)");
+  console.log("PostFlow worker running: publishing scheduled posts");
 }
 
 await bootstrap();
