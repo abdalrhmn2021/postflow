@@ -12,6 +12,16 @@ describe("validateEnv", () => {
     expect(env.WEB_ORIGIN).toBe("http://localhost:3000");
   });
 
+  it("picks the Redis key prefix from NODE_ENV, unless one is set", () => {
+    expect(validateEnv(base).REDIS_PREFIX).toBe("dev");
+    expect(validateEnv({ ...base, NODE_ENV: "test" }).REDIS_PREFIX).toBe("test");
+    const prod = { ...base, NODE_ENV: "production", JWT_SECRET: "x".repeat(32), TOKEN_ENCRYPTION_KEY: KEY };
+    expect(validateEnv(prod).REDIS_PREFIX).toBe("prod");
+    expect(validateEnv({ ...base, REDIS_PREFIX: "" }).REDIS_PREFIX).toBe("dev"); // empty = not set
+    expect(validateEnv({ ...base, REDIS_PREFIX: "staging" }).REDIS_PREFIX).toBe("staging");
+    expect(() => validateEnv({ ...base, REDIS_PREFIX: "a:b" })).toThrow(/REDIS_PREFIX/);
+  });
+
   it("turns PORT into a number", () => {
     expect(validateEnv({ ...base, PORT: "5001" }).PORT).toBe(5001);
   });

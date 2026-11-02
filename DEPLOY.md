@@ -14,7 +14,9 @@ Browser ──► Vercel (apps/web) ──/api/*──► Render (apps/api, RUN_
 
 - **Neon** - in the `postflow` project: Branches -> New branch `production` -> its connection string
   (`...?sslmode=verify-full`). Development keeps its own branch: tests never touch real data.
-- **Upstash** - Create database `postflow-prod` (Frankfurt) -> the `rediss://...` URL.
+- **Upstash** - the free plan has one database: production uses the same one as development. Every key
+  starts with `prod:` in production and `dev:` on your computer (`REDIS_PREFIX`, from `NODE_ENV`), so
+  their sessions and publish jobs never mix. Copy its `rediss://...` URL.
 - **Cloudinary** - the same account works; every file is stored under `postflow/<agency>/<client>/`.
 - **Encryption key** - `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`. Keep it safe:
   changing it later means connecting every Facebook page again.

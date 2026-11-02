@@ -18,6 +18,16 @@ const envSchema = z.object({
     .string()
     .default("redis://localhost:6379")
     .refine((v) => /^rediss?:\/\//.test(v), "REDIS_URL must start with redis:// or rediss://"),
+  // Put in front of every Redis key (sessions, limits, the publish queue), so development, the tests
+  // and production can share ONE Redis database (Upstash's free plan has one) without ever seeing each
+  // other's keys or jobs. Empty = from NODE_ENV: "dev", "test" or "prod" - usually nothing to set.
+  REDIS_PREFIX: z.preprocess(
+    emptyIsUnset,
+    z
+      .string()
+      .regex(/^[\w-]{1,32}$/, "REDIS_PREFIX: letters, digits, - and _ only")
+      .optional(),
+  ),
 
   // Where the Next.js site runs - the only origin allowed to call the API (comma-separated for several).
   WEB_ORIGIN: z.string().default("http://localhost:3000"),
@@ -117,9 +127,15 @@ const DEV_JWT_SECRET = "postflow-development-only-secret-do-not-use-in-productio
 // 32 bytes, base64. Only ever used when NODE_ENV isn't production.
 const DEV_TOKEN_KEY = Buffer.from("postflow-dev-token-key-not-prod!").toString("base64");
 
+const DEFAULT_REDIS_PREFIX = { development: "dev", test: "test", production: "prod" } as const;
+
 type Parsed = z.infer<typeof envSchema>;
-export type Env = Omit<Parsed, "JWT_SECRET" | "TOKEN_ENCRYPTION_KEY" | "META_APP_ID" | "META_APP_SECRET"> & {
+export type Env = Omit<
+  Parsed,
+  "JWT_SECRET" | "TOKEN_ENCRYPTION_KEY" | "META_APP_ID" | "META_APP_SECRET" | "REDIS_PREFIX"
+> & {
   JWT_SECRET: string;
+  REDIS_PREFIX: string; // never empty: "dev", "test", "prod" or the value set
   TOKEN_ENCRYPTION_KEY: string;
   META: MetaConfig | undefined; // undefined = connecting pages is off
 };
@@ -131,7 +147,7 @@ export function validateEnv(raw: Record<string, unknown>): Env {
     const problems = result.error.issues.map((i) => `  - ${i.path.join(".") || "env"}: ${i.message}`);
     throw new Error(`Invalid environment variables:\n${problems.join("\n")}\nSee .env.example.`);
   }
-  const { JWT_SECRET, TOKEN_ENCRYPTION_KEY, META_APP_ID, META_APP_SECRET, ...env } = result.data;
+  const { JWT_SECRET, TOKEN_ENCRYPTION_KEY, META_APP_ID, META_APP_SECRET, REDIS_PREFIX, ...env } = result.data;
   const production = env.NODE_ENV === "production";
 
   const problems: string[] = [];
@@ -146,6 +162,7 @@ export function validateEnv(raw: Record<string, unknown>): Env {
 
   return {
     ...env,
+    REDIS_PREFIX: REDIS_PREFIX ?? DEFAULT_REDIS_PREFIX[env.NODE_ENV],
     JWT_SECRET: JWT_SECRET ?? DEV_JWT_SECRET,
     TOKEN_ENCRYPTION_KEY: TOKEN_ENCRYPTION_KEY ?? DEV_TOKEN_KEY,
     META:

@@ -13,6 +13,7 @@ export function describeError(err: Error & { code?: string; errors?: Array<{ cod
 }
 
 // One Redis connection for the process. Phase 4 hands this same URL to BullMQ (the publish queue).
+// Its keys are prefixed ("prod:...") - see REDIS_PREFIX in config/env.ts.
 @Injectable()
 export class RedisService implements OnApplicationShutdown {
   private readonly logger = new Logger(RedisService.name);
@@ -26,6 +27,9 @@ export class RedisService implements OnApplicationShutdown {
       // BullMQ needs this: a blocked queue command must wait for Redis to come back, not give up.
       maxRetriesPerRequest: null,
       lazyConnect: false,
+      // "dev:", "test:" or "prod:" before every key this client reads or writes - so one Redis database
+      // can serve development and production apart. The queue has its own prefix (publish.queue.ts).
+      keyPrefix: `${config.get("REDIS_PREFIX", { infer: true })}:`,
     });
 
     // Without an 'error' listener, a lost connection would crash the process.

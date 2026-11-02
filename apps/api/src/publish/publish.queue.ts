@@ -12,6 +12,10 @@ export const PUBLISH_ATTEMPTS = 4;
 // another time, the old job finds a different time on the post and does nothing.
 export type PublishJob = { postId: string; at: number };
 
+// BullMQ's own key prefix (it refuses ioredis' keyPrefix): "prod:bull:publish:..." - so development's
+// worker never takes production's jobs, even on the same Redis database. Queue and worker must agree.
+export const queuePrefix = (redisPrefix: string) => `${redisPrefix}:bull`;
+
 // Job ids can't contain ":" - one id per post AND time, so scheduling twice adds one job.
 export const publishJobId = (postId: string, at: number) => `${postId}-${at}`;
 
@@ -28,7 +32,10 @@ export class PublishQueue implements OnModuleDestroy {
     // A connection of its own: BullMQ needs maxRetriesPerRequest: null (wait for Redis, don't give up).
     const connection = new Redis(config.get("REDIS_URL", { infer: true }), { maxRetriesPerRequest: null });
     connection.on("error", () => undefined); // RedisService already reports a lost connection
-    this.queue = new Queue<PublishJob>(PUBLISH_QUEUE, { connection });
+    this.queue = new Queue<PublishJob>(PUBLISH_QUEUE, {
+      connection,
+      prefix: queuePrefix(config.get("REDIS_PREFIX", { infer: true })),
+    });
   }
 
   async onModuleDestroy() {

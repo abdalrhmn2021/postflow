@@ -5,7 +5,7 @@ import { Redis } from "ioredis";
 import type { Env } from "../config/env.js";
 import { PostStatus } from "../generated/prisma/client.js";
 import { PrismaService } from "../prisma/prisma.service.js";
-import { PUBLISH_QUEUE, PublishQueue, publishJobId, type PublishJob } from "../publish/publish.queue.js";
+import { PUBLISH_QUEUE, PublishQueue, publishJobId, queuePrefix, type PublishJob } from "../publish/publish.queue.js";
 import { PublisherService, type PublishResult } from "../publish/publisher.service.js";
 
 const SWEEP_EVERY_MS = 60 * 60_000;
@@ -37,6 +37,7 @@ export class PublishWorker implements OnApplicationBootstrap, OnModuleDestroy {
 
     this.worker = new Worker<PublishJob, PublishResult>(PUBLISH_QUEUE, (job) => this.process(job), {
       connection,
+      prefix: queuePrefix(this.config.get("REDIS_PREFIX", { infer: true })),
       concurrency: 3,
       drainDelay: 300,
       stalledInterval: 5 * 60_000,
