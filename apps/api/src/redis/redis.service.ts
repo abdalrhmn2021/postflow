@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnApplicationShutdown } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Redis } from "ioredis";
-import type { Env } from "../config/env.js";
+import { hidePassword, type Env } from "../config/env.js";
 
 // Why a connection failed, in words. On Windows "localhost" is tried as ::1 and 127.0.0.1, and
 // when both refuse, the error is an AggregateError whose own message is EMPTY - the reason is
@@ -36,10 +36,12 @@ export class RedisService implements OnApplicationShutdown {
     this.client.on("error", (err) => {
       if (this.down) return;
       this.down = true;
-      this.logger.error(
-        `Can't reach Redis at ${url} (${describeError(err)}). Is it running? ` +
-          `Start Docker Desktop, then run "npm run db:up" in the project folder. Retrying in the background...`,
-      );
+      // Never the password: these lines end up in the host's logs (Render), visible to anyone with access.
+      const local = /^rediss?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/?$/.test(url);
+      const hint = local
+        ? `Is it running? Start Docker Desktop, then run "npm run db:up" in the project folder.`
+        : `Check REDIS_URL (Upstash needs rediss://, and the password from its TOKEN button).`;
+      this.logger.error(`Can't reach Redis at ${hidePassword(url)} (${describeError(err)}). ${hint} Retrying...`);
     });
     this.client.on("ready", () => {
       if (this.down) this.logger.log("Redis is back");

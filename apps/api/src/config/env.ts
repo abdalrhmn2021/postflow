@@ -9,15 +9,19 @@ const envSchema = z.object({
 
   // postgresql://user:password@host:5432/database
   DATABASE_URL: z
-    .string()
-    .min(1, "DATABASE_URL is required")
+    .preprocess(cleanUrl, z.string())
+    .pipe(z.string().min(1, "DATABASE_URL is required"))
     .refine((v) => /^postgres(ql)?:\/\//.test(v), "DATABASE_URL must start with postgresql://"),
 
   // redis://host:6379 (rediss:// for TLS, e.g. Upstash)
   REDIS_URL: z
-    .string()
-    .default("redis://localhost:6379")
-    .refine((v) => /^rediss?:\/\//.test(v), "REDIS_URL must start with redis:// or rediss://"),
+    .preprocess(cleanUrl, z.string().default("redis://localhost:6379"))
+    .refine((v) => /^rediss?:\/\//.test(v), "REDIS_URL must start with redis:// or rediss://")
+    // Upstash only answers over TLS: with redis:// every connection is cut (ECONNRESET), forever.
+    .refine(
+      (v) => !/^redis:\/\/[^/]*\.upstash\.io(:\d+)?\/?$/.test(v),
+      "Upstash needs rediss:// (two s - TLS), not redis://",
+    ),
   // Put in front of every Redis key (sessions, limits, the publish queue), so development, the tests
   // and production can share ONE Redis database (Upstash's free plan has one) without ever seeing each
   // other's keys or jobs. Empty = from NODE_ENV: "dev", "test" or "prod" - usually nothing to set.
@@ -109,6 +113,22 @@ const envSchema = z.object({
 
 function emptyIsUnset(v: unknown) {
   return v === "" ? undefined : v;
+}
+
+// A URL pasted into a host's form often comes with spaces, a line break or quotes around it:
+// "  'rediss://...'\n" -> rediss://... Empty counts as not set (the default applies).
+export function cleanUrl(v: unknown) {
+  if (typeof v !== "string") return v;
+  const cleaned = v
+    .trim()
+    .replace(/^(["'])(.*)\1$/s, "$2")
+    .trim();
+  return cleaned === "" ? undefined : cleaned;
+}
+
+// rediss://default:SECRET@host:6379 -> rediss://default:***@host:6379 - safe to print in logs.
+export function hidePassword(url: string) {
+  return url.replace(/^([a-z][\w+.-]*:\/\/[^:/@\s]*:)[^@\s]+@/i, "$1***@");
 }
 
 export type MetaConfig = { appId: string; appSecret: string; graphVersion: string };

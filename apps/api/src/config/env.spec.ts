@@ -1,4 +1,4 @@
-import { validateEnv } from "./env.js";
+import { cleanUrl, hidePassword, validateEnv } from "./env.js";
 
 const KEY = Buffer.alloc(32, 7).toString("base64");
 const base = { DATABASE_URL: "postgresql://postflow:postflow@localhost:5432/postflow" };
@@ -20,6 +20,31 @@ describe("validateEnv", () => {
     expect(validateEnv({ ...base, REDIS_PREFIX: "" }).REDIS_PREFIX).toBe("dev"); // empty = not set
     expect(validateEnv({ ...base, REDIS_PREFIX: "staging" }).REDIS_PREFIX).toBe("staging");
     expect(() => validateEnv({ ...base, REDIS_PREFIX: "a:b" })).toThrow(/REDIS_PREFIX/);
+  });
+
+  it("cleans pasted URLs: spaces, line breaks and quotes around them", () => {
+    expect(cleanUrl("  'rediss://default:pw@x.upstash.io:6379'\n")).toBe("rediss://default:pw@x.upstash.io:6379");
+    expect(cleanUrl('"postgresql://a:b@h/db"')).toBe("postgresql://a:b@h/db");
+    expect(cleanUrl("   ")).toBeUndefined();
+    const env = validateEnv({ ...base, DATABASE_URL: ` ${base.DATABASE_URL} `, REDIS_URL: ' "rediss://h:6379" ' });
+    expect(env.DATABASE_URL).toBe(base.DATABASE_URL);
+    expect(env.REDIS_URL).toBe("rediss://h:6379");
+    expect(validateEnv({ ...base, REDIS_URL: "" }).REDIS_URL).toBe("redis://localhost:6379"); // empty = default
+  });
+
+  it("refuses Upstash without TLS (redis:// instead of rediss://)", () => {
+    expect(() => validateEnv({ ...base, REDIS_URL: "redis://default:pw@stable-lacewing-1.upstash.io:6379" })).toThrow(
+      /Upstash needs rediss:\/\//,
+    );
+    expect(
+      validateEnv({ ...base, REDIS_URL: "rediss://default:pw@stable-lacewing-1.upstash.io:6379" }).REDIS_URL,
+    ).toMatch(/^rediss:/);
+  });
+
+  it("hides the password of a URL before it is logged", () => {
+    expect(hidePassword("rediss://default:s3cr:et@x.upstash.io:6379")).toBe("rediss://default:***@x.upstash.io:6379");
+    expect(hidePassword("redis://localhost:6379")).toBe("redis://localhost:6379");
+    expect(hidePassword("redis://:pw@host:6379")).toBe("redis://:***@host:6379");
   });
 
   it("turns PORT into a number", () => {
