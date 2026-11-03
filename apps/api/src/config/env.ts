@@ -100,13 +100,24 @@ const envSchema = z.object({
 
   // Encrypts the pages' access tokens in the database (AES-256-GCM): 32 random bytes, base64.
   //   node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
-  // Optional in development (a fixed dev key); required in production. Changing it makes every
-  // stored token unreadable: the clients' pages must then be connected again.
+  // Optional in development (a fixed dev key); required in production. Changing it alone makes every
+  // stored token unreadable (the clients' pages must be connected again) - see the next setting.
   TOKEN_ENCRYPTION_KEY: z.preprocess(
     emptyIsUnset,
     z
       .string()
       .refine((v) => Buffer.from(v, "base64").length === 32, "TOKEN_ENCRYPTION_KEY must be 32 bytes in base64")
+      .optional(),
+  ),
+  // Changing the key without losing the pages (DEPLOY.md, "Changing TOKEN_ENCRYPTION_KEY"): put the
+  // old key here and the new one in TOKEN_ENCRYPTION_KEY. Tokens still locked with the old key keep
+  // working, and the worker re-encrypts them with the new one. Once its log says they're all done,
+  // remove this.
+  TOKEN_ENCRYPTION_KEY_PREVIOUS: z.preprocess(
+    emptyIsUnset,
+    z
+      .string()
+      .refine((v) => Buffer.from(v, "base64").length === 32, "TOKEN_ENCRYPTION_KEY_PREVIOUS must be 32 bytes in base64")
       .optional(),
   ),
 });

@@ -27,12 +27,22 @@ export function decrypt(stored: string, key: Buffer): string {
   return Buffer.concat([decipher.update(Buffer.from(data, "base64url")), decipher.final()]).toString("utf8");
 }
 
+// Encrypts with TOKEN_ENCRYPTION_KEY. Decrypts with it, or - while the key is being changed - with
+// TOKEN_ENCRYPTION_KEY_PREVIOUS, so the tokens stored before the change keep working.
 @Injectable()
 export class TokenCipher {
   private readonly key: Buffer;
+  private readonly previousKey: Buffer | undefined;
 
   constructor(config: ConfigService<Env, true>) {
     this.key = Buffer.from(config.get("TOKEN_ENCRYPTION_KEY", { infer: true }), "base64");
+    const previous = config.get("TOKEN_ENCRYPTION_KEY_PREVIOUS", { infer: true });
+    this.previousKey = previous ? Buffer.from(previous, "base64") : undefined;
+  }
+
+  // True while the key is being changed: the worker then re-encrypts the old tokens.
+  get rotating() {
+    return this.previousKey !== undefined;
   }
 
   encrypt(plain: string) {
@@ -40,6 +50,17 @@ export class TokenCipher {
   }
 
   decrypt(stored: string) {
-    return decrypt(stored, this.key);
+    return this.open(stored).plain;
+  }
+
+  // Like decrypt, and also says whether it took the previous key (old = encrypt it again).
+  // Throws when neither key opens it.
+  open(stored: string): { plain: string; old: boolean } {
+    try {
+      return { plain: decrypt(stored, this.key), old: false };
+    } catch (err) {
+      if (!this.previousKey) throw err;
+      return { plain: decrypt(stored, this.previousKey), old: true };
+    }
   }
 }

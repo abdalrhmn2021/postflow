@@ -48,6 +48,15 @@ Render's free services sleep after 15 minutes without visits - a sleeping worker
 Create the Meta app, add `https://<site>.vercel.app/api/meta/callback` to its Valid OAuth Redirect URIs, and set
 `META_APP_ID` / `META_APP_SECRET` on Render. Until then, connecting pages is off and scheduled posts fail at their time.
 
+## Changing TOKEN_ENCRYPTION_KEY
+
+Only if the key may have leaked. Changing it alone locks every stored page token - so, on Render:
+
+1. `TOKEN_ENCRYPTION_KEY_PREVIOUS` = the current key; `TOKEN_ENCRYPTION_KEY` = a new one (the command in `.env.example`).
+2. Save (Render restarts the service). The worker re-encrypts the tokens at start - its log says
+   `Key change: N page token(s) re-encrypted with the new key, 0 left on the old one`.
+3. Delete `TOKEN_ENCRYPTION_KEY_PREVIOUS`.
+
 ## Upgrading later
 
 Render **Starter** plan for `postflow-api` (always awake, faster). For more load: `RUN_WORKER=false` on the API and a

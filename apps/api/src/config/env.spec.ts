@@ -104,6 +104,15 @@ describe("validateEnv", () => {
     );
   });
 
+  it("TOKEN_ENCRYPTION_KEY_PREVIOUS: optional, 32 bytes when set", () => {
+    expect(validateEnv(base).TOKEN_ENCRYPTION_KEY_PREVIOUS).toBeUndefined();
+    expect(validateEnv({ ...base, TOKEN_ENCRYPTION_KEY_PREVIOUS: "" }).TOKEN_ENCRYPTION_KEY_PREVIOUS).toBeUndefined();
+    expect(validateEnv({ ...base, TOKEN_ENCRYPTION_KEY_PREVIOUS: KEY }).TOKEN_ENCRYPTION_KEY_PREVIOUS).toBe(KEY);
+    expect(() => validateEnv({ ...base, TOKEN_ENCRYPTION_KEY_PREVIOUS: "short" })).toThrow(
+      /TOKEN_ENCRYPTION_KEY_PREVIOUS must be 32 bytes/,
+    );
+  });
+
   it("RUN_WORKER: off unless it's exactly true", () => {
     expect(validateEnv(base).RUN_WORKER).toBe(false);
     expect(validateEnv({ ...base, RUN_WORKER: "true" }).RUN_WORKER).toBe(true);

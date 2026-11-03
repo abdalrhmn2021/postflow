@@ -1,15 +1,20 @@
 import type { INestApplication, INestApplicationContext } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { Test } from "@nestjs/testing";
+import type { Job } from "bullmq";
+import { randomBytes } from "node:crypto";
 import request from "supertest";
 import type { App } from "supertest/types.js";
+import type { Env } from "../src/config/env.js";
 import { AccountStatus, PostStatus } from "../src/generated/prisma/client.js";
 import { MediaStorage } from "../src/media/media-storage.js";
 import { MetaApiError } from "../src/meta/graph-api.meta.js";
 import { MetaGraph } from "../src/meta/meta-graph.js";
-import { TokenCipher } from "../src/meta/token-cipher.js";
+import { decrypt, encrypt, TokenCipher } from "../src/meta/token-cipher.js";
 import { PrismaService } from "../src/prisma/prisma.service.js";
 import { PublishQueue, publishJobId } from "../src/publish/publish.queue.js";
 import { PublisherService, RetryLater } from "../src/publish/publisher.service.js";
+import { INTERRUPTED, PublishWorker } from "../src/worker/publish.worker.js";
 import { WorkerModule } from "../src/worker/worker.module.js";
 import { startApp, uniqueRun } from "./app.js";
 import { FakeMediaStorage } from "./fake-media-storage.js";
@@ -204,6 +209,102 @@ describe("publishing", () => {
     );
     expect(meta.sent).toEqual([]);
     await prisma.socialAccount.update({ where: { brandId }, data: { status: AccountStatus.OK } });
+  });
+
+  describe("the hourly sweep", () => {
+    // The worker's sweep, run by hand - without starting BullMQ's worker.
+    const sweeper = (cipher = app.get(TokenCipher)) =>
+      new PublishWorker(app.get(ConfigService), publisher, queue, prisma, cipher);
+
+    // As if a try claimed it `minutesAgo` minutes ago and then the server stopped.
+    async function stuckPublishing(id: string, minutesAgo: number) {
+      await prisma.post.update({ where: { id }, data: { status: PostStatus.PUBLISHING } });
+      const then = new Date(Date.now() - minutesAgo * 60_000);
+      await prisma.$executeRaw`UPDATE "Post" SET "updatedAt" = ${then} WHERE id = ${id}`; // @updatedAt can't be set
+    }
+
+    it("a post stuck PUBLISHING with no job on it becomes FAILED - and can be scheduled again", async () => {
+      const { id, at } = await scheduled(["FACEBOOK"]);
+      await stuckPublishing(id, 60);
+      await queue.queue.remove(publishJobId(id, at)); // Redis lost the job
+
+      await sweeper().sweep();
+      const post = await prisma.post.findUniqueOrThrow({ where: { id } });
+      expect(post.status).toBe(PostStatus.FAILED);
+      expect(post.failReason).toBe(INTERRUPTED);
+      expect(meta.sent).toEqual([]); // never sent again on its own
+
+      await owner.post(`/api/posts/${id}/schedule`).expect(200); // the website can change it again
+      expect(await status(id)).toBe(PostStatus.SCHEDULED);
+    });
+
+    it("a job that already failed counts as no job", async () => {
+      const { id, at } = await scheduled(["FACEBOOK"]);
+      await stuckPublishing(id, 60);
+      // Its job used up its tries (crashed on the last one): BullMQ keeps it, in the "failed" state.
+      const getJob = queue.queue.getJob.bind(queue.queue);
+      const spy = vi
+        .spyOn(queue.queue, "getJob")
+        .mockImplementation(async (jobId: string) =>
+          jobId === publishJobId(id, at) ? ({ getState: async () => "failed" } as unknown as Job) : getJob(jobId),
+        );
+      try {
+        await sweeper().sweep();
+      } finally {
+        spy.mockRestore();
+      }
+      expect(await status(id)).toBe(PostStatus.FAILED);
+    });
+
+    it("left alone: a post whose job is still on it, and one that started publishing a moment ago", async () => {
+      const slow = await scheduled(["FACEBOOK"]); // its delayed job is still in the queue
+      await stuckPublishing(slow.id, 60);
+      const recent = await scheduled(["FACEBOOK"]);
+      await stuckPublishing(recent.id, 1);
+      await queue.queue.remove(publishJobId(recent.id, recent.at));
+
+      await sweeper().sweep();
+      expect(await status(slow.id)).toBe(PostStatus.PUBLISHING);
+      expect(await status(recent.id)).toBe(PostStatus.PUBLISHING);
+      await prisma.post.updateMany({
+        where: { id: { in: [slow.id, recent.id] } },
+        data: { status: PostStatus.DRAFT, scheduledAt: null },
+      });
+    });
+
+    it("a try claiming the post bumps updatedAt, so a post being retried is never 'stuck'", async () => {
+      const { id, at } = await scheduled(["FACEBOOK", "INSTAGRAM"]);
+      meta.failNext.INSTAGRAM.push(busy());
+      await expect(publisher.publish(id, at, false)).rejects.toThrow(RetryLater);
+      const { updatedAt } = await prisma.post.findUniqueOrThrow({ where: { id } });
+      expect(Date.now() - updatedAt.getTime()).toBeLessThan(60_000);
+      await prisma.post.update({ where: { id }, data: { status: PostStatus.DRAFT, scheduledAt: null } });
+    });
+
+    it("changing TOKEN_ENCRYPTION_KEY: the page tokens on the old key are re-encrypted with the new one", async () => {
+      const OLD = randomBytes(32);
+      const NEW = randomBytes(32);
+      const rotating = new TokenCipher({
+        get: (name: string) =>
+          name === "TOKEN_ENCRYPTION_KEY"
+            ? NEW.toString("base64")
+            : name === "TOKEN_ENCRYPTION_KEY_PREVIOUS"
+              ? OLD.toString("base64")
+              : undefined,
+      } as unknown as ConfigService<Env, true>);
+      const otherBrand = (await owner.post("/api/brands").send({ name: "Shawarma" }).expect(201)).body.id as string;
+      await prisma.socialAccount.create({
+        data: { brandId: otherBrand, pageId: "2002", pageName: "Shawarma", pageToken: encrypt("OLD-KEY-TOKEN", OLD) },
+      });
+      const before = (await prisma.socialAccount.findUniqueOrThrow({ where: { brandId } })).pageToken;
+
+      await sweeper(rotating).sweep();
+      const after = (await prisma.socialAccount.findUniqueOrThrow({ where: { brandId: otherBrand } })).pageToken;
+      expect(decrypt(after, NEW)).toBe("OLD-KEY-TOKEN"); // the new key alone opens it now
+      expect(() => decrypt(after, OLD)).toThrow();
+      // A token neither key opens (here: the test key) is left exactly as it was.
+      expect((await prisma.socialAccount.findUniqueOrThrow({ where: { brandId } })).pageToken).toBe(before);
+    });
   });
 
   it("the real thing: the worker takes the job off the queue at its time and publishes", async () => {
