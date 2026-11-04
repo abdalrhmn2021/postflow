@@ -79,6 +79,7 @@ export class PublishWorker implements OnApplicationBootstrap, OnModuleDestroy {
     await this.queueScheduled();
     await this.failStuck();
     await this.reencryptTokens();
+    await this.deleteExpiredSessions();
   }
 
   // The safety net: every scheduled post gets its job, even one scheduled while Redis was down, or
@@ -139,6 +140,16 @@ export class PublishWorker implements OnApplicationBootstrap, OnModuleDestroy {
       if (failed > 0) this.logger.warn(`Sweep: ${failed} post(s) stuck publishing, now FAILED`);
     } catch (err) {
       this.logger.warn(`Stuck-post check failed (next one in an hour): ${(err as Error).message}`);
+    }
+  }
+
+  // Logins whose 7 days are over: AuthGuard already refuses them, this just keeps the table small.
+  private async deleteExpiredSessions() {
+    try {
+      const { count } = await this.prisma.session.deleteMany({ where: { expiresAt: { lte: new Date() } } });
+      if (count > 0) this.logger.log(`Sweep: ${count} expired login(s) deleted`);
+    } catch (err) {
+      this.logger.warn(`Deleting expired logins failed (next try in an hour): ${(err as Error).message}`);
     }
   }
 

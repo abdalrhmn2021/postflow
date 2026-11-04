@@ -1,7 +1,7 @@
 import type { INestApplication } from "@nestjs/common";
 import request from "supertest";
 import type { App } from "supertest/types.js";
-import { LOGIN_ATTEMPTS } from "../src/auth/login-limit.service.js";
+import { LOGIN_ATTEMPTS } from "../src/auth/rate-limit.service.js";
 import { PrismaService } from "../src/prisma/prisma.service.js";
 import { RedisService } from "../src/redis/redis.service.js";
 import { startApp, uniqueRun } from "./app.js";
@@ -100,6 +100,62 @@ describe("login, me and logout", () => {
     await agent.post("/api/auth/logout").expect(204);
     const after = await agent.get("/api/auth/me").expect(401);
     expect(after.body.code).toBe("UNAUTHENTICATED");
+  });
+
+  it("logout closes the login itself: a copy of the cookie stops working too", async () => {
+    const res = await login({ email: EMAIL, password: PASSWORD }).expect(200);
+    const cookie = sessionCookie(res)!.split(";")[0]; // pf_session=<token>, as a thief would copy it
+    const me = () => request(app.getHttpServer()).get("/api/auth/me").set("Cookie", cookie);
+
+    await me().expect(200);
+    await request(app.getHttpServer()).post("/api/auth/logout").set("Cookie", cookie).expect(204);
+    await me().expect(401); // the token is still in date and correctly signed - its login is gone
+  });
+
+  it("logout on one device leaves the other devices logged in", async () => {
+    const phone = request.agent(app.getHttpServer());
+    const laptop = request.agent(app.getHttpServer());
+    await phone.post("/api/auth/login").set("X-Forwarded-For", newIp()).send({ email: EMAIL, password: PASSWORD });
+    await laptop.post("/api/auth/login").set("X-Forwarded-For", newIp()).send({ email: EMAIL, password: PASSWORD });
+
+    await phone.post("/api/auth/logout").expect(204);
+    await phone.get("/api/auth/me").expect(401);
+    await laptop.get("/api/auth/me").expect(200);
+  });
+
+  it("logout-all ends every login of the person, and only theirs", async () => {
+    const other = request.agent(app.getHttpServer());
+    await other
+      .post("/api/auth/register")
+      .send({ agencyName: "Other2", slug: `${RUN}-other2`, name: "O2", email: `o2@${RUN}.test`, password: PASSWORD })
+      .expect(201);
+
+    const phone = request.agent(app.getHttpServer());
+    const laptop = request.agent(app.getHttpServer());
+    await phone.post("/api/auth/login").set("X-Forwarded-For", newIp()).send({ email: EMAIL, password: PASSWORD });
+    await laptop.post("/api/auth/login").set("X-Forwarded-For", newIp()).send({ email: EMAIL, password: PASSWORD });
+
+    const res = await laptop.post("/api/auth/logout-all").expect(204);
+    expect(sessionCookie(res)).toMatch(/^pf_session=;/); // this browser's cookie removed too
+    await phone.get("/api/auth/me").expect(401);
+    await laptop.get("/api/auth/me").expect(401);
+    await other.get("/api/auth/me").expect(200); // someone else's login is untouched
+
+    await request(app.getHttpServer()).post("/api/auth/logout-all").expect(401); // needs a login
+  });
+
+  it("a login stored in the database is refused once its time is over", async () => {
+    const agent = request.agent(app.getHttpServer());
+    await agent.post("/api/auth/login").set("X-Forwarded-For", newIp()).send({ email: EMAIL, password: PASSWORD });
+    const prisma = app.get(PrismaService);
+    const user = await prisma.user.findUniqueOrThrow({ where: { email: EMAIL } });
+    const newest = await prisma.session.findFirstOrThrow({
+      where: { userId: user.id },
+      orderBy: { createdAt: "desc" },
+    });
+    await prisma.session.update({ where: { id: newest.id }, data: { expiresAt: new Date(Date.now() - 1000) } });
+
+    await agent.get("/api/auth/me").expect(401);
   });
 
   it("GET /me refuses no cookie and a forged cookie", async () => {

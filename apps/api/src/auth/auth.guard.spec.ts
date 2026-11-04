@@ -25,8 +25,11 @@ const editor: SessionUser = {
 
 // The guard with a token checker and a user lookup we control.
 function setup(user: SessionUser | null = editor) {
-  const sessions = { verify: (t: string | null) => Promise.resolve(t === "good-token" ? "u1" : null) };
-  const auth = { findSessionUser: () => Promise.resolve(user) };
+  const sessions = {
+    verify: (t: string | null) => Promise.resolve(t === "good-token" ? { sessionId: "s1", userId: "u1" } : null),
+  };
+  // null = the login was closed (logged out) or the user deleted: AuthService finds no open session.
+  const auth = { findUserBySession: () => Promise.resolve(user) };
   const guard = new AuthGuard(new Reflector(), sessions as SessionService, auth as unknown as AuthService);
 
   const call = (route: keyof Routes, cookie?: string) => {
@@ -51,7 +54,7 @@ describe("AuthGuard", () => {
     await expect(setup()("anyLoggedIn", "pf_session=forged").result).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
-  it("refuses a valid token whose user was deleted", async () => {
+  it("refuses a valid token whose login was closed or whose user was deleted", async () => {
     await expect(setup(null)("anyLoggedIn", "pf_session=good-token").result).rejects.toBeInstanceOf(
       UnauthorizedException,
     );

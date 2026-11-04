@@ -10,6 +10,9 @@ import type { AnswerInput } from "./review.schemas.js";
 
 export const REVIEW_DAYS = 14;
 
+// The posts a client can still see and answer on the link: not published, not being published.
+const OPEN_STATUSES: PostStatus[] = [PostStatus.DRAFT, PostStatus.SCHEDULED, PostStatus.FAILED];
+
 // Same idea as invite links: 32 random bytes in the link, only their SHA-256 in the database.
 const newToken = () => randomBytes(32).toString("base64url");
 const hash = (token: string) => createHash("sha256").update(token).digest("hex");
@@ -77,7 +80,7 @@ export class ReviewService {
       where: {
         brandId: link.brandId,
         approval: { not: Approval.NONE },
-        status: { in: [PostStatus.DRAFT, PostStatus.SCHEDULED, PostStatus.FAILED] },
+        status: { in: OPEN_STATUSES },
       },
       select: reviewPostSelect,
       orderBy: [{ scheduledAt: { sort: "asc", nulls: "last" } }, { createdAt: "asc" }],
@@ -91,13 +94,14 @@ export class ReviewService {
     };
   }
 
-  // The client's answer about one post of that brand. Only a post waiting for it (PENDING): an
-  // answer can't undo the agency's later change, and the same click twice changes nothing.
+  // The client's answer about one post of that brand. Only a post waiting for it (PENDING) and not
+  // published or being published: an answer can't undo the agency's later change, can't rewrite the
+  // history of a post that's already out, and the same click twice changes nothing.
   async answer(token: string, postId: string, { decision, note }: AnswerInput) {
     const link = await this.findLink(token);
     const approved = decision === "APPROVE";
     const { count } = await this.prisma.post.updateMany({
-      where: { id: postId, brandId: link.brandId, approval: Approval.PENDING },
+      where: { id: postId, brandId: link.brandId, approval: Approval.PENDING, status: { in: OPEN_STATUSES } },
       data: {
         approval: approved ? Approval.APPROVED : Approval.CHANGES_REQUESTED,
         approvalNote: approved ? (note ?? null) : note,

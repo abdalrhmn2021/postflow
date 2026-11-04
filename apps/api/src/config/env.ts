@@ -84,6 +84,10 @@ const envSchema = z.object({
 
   // "true": the API process runs the publish worker too - one service instead of two, for a free
   // host. Leave it off (the default) when the worker runs as its own service (npm run worker).
+  // Sign-ups allowed per hour from one IP (fake agencies). 0 = no limit. Not set: 10 in production,
+  // no limit in development and tests (they sign up many agencies from localhost).
+  SIGNUPS_PER_HOUR: z.preprocess(emptyIsUnset, z.coerce.number().int().min(0).max(1000).optional()),
+
   RUN_WORKER: z
     .enum(["true", "false", ""], "RUN_WORKER is true or false")
     .default("false")
@@ -163,8 +167,9 @@ const DEFAULT_REDIS_PREFIX = { development: "dev", test: "test", production: "pr
 type Parsed = z.infer<typeof envSchema>;
 export type Env = Omit<
   Parsed,
-  "JWT_SECRET" | "TOKEN_ENCRYPTION_KEY" | "META_APP_ID" | "META_APP_SECRET" | "REDIS_PREFIX"
+  "JWT_SECRET" | "TOKEN_ENCRYPTION_KEY" | "META_APP_ID" | "META_APP_SECRET" | "REDIS_PREFIX" | "SIGNUPS_PER_HOUR"
 > & {
+  SIGNUPS_PER_HOUR: number; // 0 = no limit
   JWT_SECRET: string;
   REDIS_PREFIX: string; // never empty: "dev", "test", "prod" or the value set
   TOKEN_ENCRYPTION_KEY: string;
@@ -178,7 +183,8 @@ export function validateEnv(raw: Record<string, unknown>): Env {
     const problems = result.error.issues.map((i) => `  - ${i.path.join(".") || "env"}: ${i.message}`);
     throw new Error(`Invalid environment variables:\n${problems.join("\n")}\nSee .env.example.`);
   }
-  const { JWT_SECRET, TOKEN_ENCRYPTION_KEY, META_APP_ID, META_APP_SECRET, REDIS_PREFIX, ...env } = result.data;
+  const { JWT_SECRET, TOKEN_ENCRYPTION_KEY, META_APP_ID, META_APP_SECRET, REDIS_PREFIX, SIGNUPS_PER_HOUR, ...env } =
+    result.data;
   const production = env.NODE_ENV === "production";
 
   const problems: string[] = [];
@@ -194,6 +200,7 @@ export function validateEnv(raw: Record<string, unknown>): Env {
   return {
     ...env,
     REDIS_PREFIX: REDIS_PREFIX ?? DEFAULT_REDIS_PREFIX[env.NODE_ENV],
+    SIGNUPS_PER_HOUR: SIGNUPS_PER_HOUR ?? (production ? 10 : 0),
     JWT_SECRET: JWT_SECRET ?? DEV_JWT_SECRET,
     TOKEN_ENCRYPTION_KEY: TOKEN_ENCRYPTION_KEY ?? DEV_TOKEN_KEY,
     META:

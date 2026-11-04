@@ -3,6 +3,7 @@ import { Prisma, Role } from "../generated/prisma/client.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { RESERVED_SLUGS, type LoginInput, type RegisterInput } from "./auth.schemas.js";
 import { hashPassword, verifyPassword } from "./password.js";
+import type { SessionToken } from "./session.service.js";
 
 // Fixed codes the website translates (Arabic / English), like BookFlow's error codes.
 const emailTaken = () => new ConflictException({ code: "EMAIL_TAKEN", message: "This email already has an account" });
@@ -102,5 +103,15 @@ export class AuthService {
   // at once, and a changed role applies at once. One lookup by primary key - fast.
   findSessionUser(userId: string): Promise<SessionUser | null> {
     return this.prisma.user.findUnique({ where: { id: userId }, select: sessionSelect });
+  }
+
+  // The user of an open login: the Session row must still exist (not logged out), not be expired,
+  // and belong to the user the token names. Still one query (the row and its user together).
+  async findUserBySession({ sessionId, userId }: SessionToken): Promise<SessionUser | null> {
+    const session = await this.prisma.session.findFirst({
+      where: { id: sessionId, userId, expiresAt: { gt: new Date() } },
+      select: { user: { select: sessionSelect } },
+    });
+    return session?.user ?? null;
   }
 }

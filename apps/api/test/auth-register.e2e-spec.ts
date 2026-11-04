@@ -1,7 +1,10 @@
 import type { INestApplication } from "@nestjs/common";
 import request from "supertest";
 import type { App } from "supertest/types.js";
+import { ConfigService } from "@nestjs/config";
+import { RateLimitService } from "../src/auth/rate-limit.service.js";
 import { PrismaService } from "../src/prisma/prisma.service.js";
+import { RedisService } from "../src/redis/redis.service.js";
 import { startApp, uniqueRun } from "./app.js";
 
 // Every agency made here has a slug starting with this, so afterAll removes exactly these
@@ -71,5 +74,57 @@ describe("POST /api/auth/register", () => {
 
     expect(res.body.code).toBe("VALIDATION_ERROR");
     expect(Object.keys(res.body.fields).sort()).toEqual(["email", "name", "password", "slug"]);
+  });
+});
+
+// Sign-ups are limited per IP. The tests normally run with no limit (SIGNUPS_PER_HOUR is 0 outside
+// production), so this app gets a limit of 2.
+describe("POST /api/auth/register - the sign-up limit", () => {
+  const LIMITED_RUN = uniqueRun();
+  const IP = "198.51.100.7";
+  let app: INestApplication<App>;
+
+  beforeAll(async () => {
+    app = await startApp((b) =>
+      b.overrideProvider(RateLimitService).useFactory({
+        factory: (redis: RedisService) =>
+          new RateLimitService(redis, { get: () => 2 } as unknown as ConfigService<never, true>),
+        inject: [RedisService],
+      }),
+    );
+    await app.get(RedisService).client.del(`signups:${IP}`);
+  });
+
+  afterAll(async () => {
+    await app?.get(PrismaService).agency.deleteMany({ where: { slug: { startsWith: LIMITED_RUN } } });
+    await app?.get(RedisService).client.del(`signups:${IP}`);
+    await app?.close();
+  });
+
+  const signUpFrom = (ip: string, n: number) =>
+    request(app.getHttpServer())
+      .post("/api/auth/register")
+      .set("X-Forwarded-For", ip)
+      .send({
+        agencyName: `Agency ${n}`,
+        slug: `${LIMITED_RUN}-${n}`,
+        name: "Owner",
+        email: `owner${n}@${LIMITED_RUN}.test`,
+        password: "a-long-password",
+      });
+
+  it("allows 2 sign-ups an hour from one IP, then answers 429 TOO_MANY_SIGNUPS", async () => {
+    await signUpFrom(IP, 1).expect(201);
+    await signUpFrom(IP, 2).expect(201);
+    const blocked = await signUpFrom(IP, 3).expect(429);
+    expect(blocked.body.code).toBe("TOO_MANY_SIGNUPS");
+    expect(blocked.body.retryAfter).toBeGreaterThan(0);
+    expect(await app.get(PrismaService).agency.count({ where: { slug: `${LIMITED_RUN}-3` } })).toBe(0);
+  });
+
+  it("doesn't limit another visitor", async () => {
+    const ip = "198.51.100.8";
+    await signUpFrom(ip, 4).expect(201);
+    await app.get(RedisService).client.del(`signups:${ip}`);
   });
 });

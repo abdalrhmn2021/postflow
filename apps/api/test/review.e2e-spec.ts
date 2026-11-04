@@ -155,6 +155,17 @@ describe("client approval", () => {
     expect(changed.body.approval).toBe("NONE");
   });
 
+  it("a post that's already out (or going out) can't be answered any more", async () => {
+    const id = await draft("نزل قبل ما العميل يرد");
+    await editor.post(`/api/posts/${id}/approval`).expect(200);
+    for (const status of ["PUBLISHING", "PUBLISHED"] as const) {
+      await prisma.post.update({ where: { id }, data: { status } }); // as the worker would
+      const res = await client.post(`/api/review/${token}/posts/${id}`).send({ decision: "APPROVE" }).expect(409);
+      expect(res.body.code).toBe("REVIEW_DONE");
+    }
+    expect((await prisma.post.findUniqueOrThrow({ where: { id } })).approval).toBe("PENDING"); // unchanged
+  });
+
   it("a link reaches its own brand only, and can be stopped", async () => {
     const coffeePost = (await owner.post("/api/posts").send({ brandId: otherBrandId, caption: "x" }).expect(201)).body
       .id;

@@ -54,8 +54,24 @@ model User {
   brands      BrandMember[]
   invitesSent Invite[]
   posts       Post[]
+  sessions    Session[]
 
   @@index([agencyId])
+}
+
+// One login (one browser, one device). The login cookie holds a signed token with this row's id:
+// AuthGuard accepts it only while the row exists. Logging out deletes the row, so a copied cookie
+// stops working at once - not 7 days later when the token runs out. "Log out everywhere" (and, later,
+// a new password) deletes all of a person's rows. The worker deletes expired rows every hour.
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt]) // the worker's hourly clean-up
 }
 
 // An agency's client (a business whose pages the agency runs).

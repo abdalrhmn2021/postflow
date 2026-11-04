@@ -111,3 +111,26 @@ test("the client approves a post through the review link, with no account", asyn
   await page.getByRole("button", { name: "جدول المنشور" }).click();
   await expect(page.getByText("انجدول المنشور ✓")).toBeVisible();
 });
+
+test("logging out of every device from the account page", async ({ page, browser }) => {
+  await signUp(page, "d");
+
+  // The same person on a second device (its own cookies), logged in too.
+  const phone = await (await browser.newContext({ locale: "ar" })).newPage();
+  await phone.goto("/ar/login");
+  await phone.fill("input[name=email]", `d@${RUN}.test`);
+  await phone.fill("input[name=password]", PASSWORD);
+  await phone.getByRole("button", { name: "دخول" }).click();
+  await expect(phone).toHaveURL(/\/ar\/dashboard/);
+
+  await page.getByRole("link", { name: "حسابي" }).click();
+  await expect(page.getByRole("heading", { name: "حسابي" })).toBeVisible();
+  await expect(page.getByText(`d@${RUN}.test`)).toBeVisible();
+  await page.getByRole("button", { name: "اطلع من كل الأجهزة" }).click();
+  await page.getByRole("button", { name: "أيوا، اطلع من الكل" }).click();
+  await expect(page).toHaveURL(/\/ar\/login/);
+
+  // The phone still has its cookie, but that login is over.
+  await phone.reload();
+  await expect(phone).toHaveURL(/\/ar\/login/);
+});

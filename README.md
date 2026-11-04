@@ -2,6 +2,8 @@
 
 **Social media scheduling for agencies.** An agency plans its clients' posts on one calendar, the client approves them from a link, and each post goes out on Facebook and Instagram at its time - automatically. Captions are drafted by AI in the brand's own voice.
 
+> **Improvements 1 (security)** - logins are stored (a `Session` row per device): logging out ends the login itself, so a copied cookie stops working at once; "log out of every device" on the new account page; sign-ups limited per IP (`SIGNUPS_PER_HOUR`, 10 in production); a client can't answer a post that's already out; expired logins cleaned up by the worker's hourly sweep.
+>
 > Status: **phase 7 (launch)** - ready to deploy: browser tests (Playwright: sign-up, login, language, a post to the calendar, the client's approval) in CI; `RUN_WORKER=true` runs the publish worker inside the API (one free service); `/api/health/ping` for an uptime pinger that doesn't wake the database; `render.yaml` and [DEPLOY.md](DEPLOY.md) for Vercel + Render.
 >
 > **Phase 6 (AI captions)** - done. "Write me a caption" in the post editor: the idea in a few words -> three really different captions in the client's language and voice (from the client's settings), hashtags cleaned and after the text, within Instagram's limits; "improve the text I wrote" sends the draft too. Google Gemini through its REST API in JSON mode; the agency's words go to the model as quoted data, not instructions; at most 30 requests per person per hour. Nothing is saved until the person picks one.

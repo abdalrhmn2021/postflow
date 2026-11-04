@@ -3,7 +3,7 @@ import { APP_GUARD } from "@nestjs/core";
 import { AuthGuard } from "./auth.guard.js";
 import { AuthController } from "./auth.controller.js";
 import { AuthService } from "./auth.service.js";
-import { LoginLimitService } from "./login-limit.service.js";
+import { RateLimitService } from "./rate-limit.service.js";
 import { SessionService } from "./session.service.js";
 
 @Module({
@@ -11,7 +11,7 @@ import { SessionService } from "./session.service.js";
   providers: [
     AuthService,
     SessionService,
-    LoginLimitService,
+    RateLimitService,
     // AuthGuard on every route of every module - routes opt out with @Public().
     { provide: APP_GUARD, useClass: AuthGuard },
   ],

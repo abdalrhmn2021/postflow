@@ -68,7 +68,7 @@ export class InvitesController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const session = await this.invites.accept(body);
-    res.cookie(SESSION_COOKIE, await this.sessions.sign(session.user.id), sessionCookieOptions(this.production));
+    res.cookie(SESSION_COOKIE, await this.sessions.start(session.user.id), sessionCookieOptions(this.production));
     return session;
   }
 }

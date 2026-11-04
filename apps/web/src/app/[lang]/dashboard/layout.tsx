@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Suspense } from "react";
 import { Logo } from "@/components/Logo";
 import { LanguageSwitch } from "@/components/ui/LanguageSwitch";
@@ -57,10 +58,18 @@ async function UserBar() {
     <>
       <span className="truncate border-s border-line ps-4 font-semibold">{agency.name}</span>
       <div className="ms-auto flex items-center gap-3">
-        <div className="hidden text-end leading-tight sm:block">
-          <p className="text-sm font-medium">{user.name}</p>
-          <p className="text-xs text-muted">{t.roles[user.role]}</p>
-        </div>
+        {/* Name and role -> the account page (on a phone, just "My account"). */}
+        <Link
+          href={`/${locale}/dashboard/account`}
+          aria-label={t.account}
+          className="rounded-lg px-2 py-1 text-end leading-tight hover:bg-line/40"
+        >
+          <span className="text-sm font-medium sm:hidden">{t.account}</span>
+          <span className="hidden sm:block">
+            <span className="block text-sm font-medium">{user.name}</span>
+            <span className="block text-xs text-muted">{t.roles[user.role]}</span>
+          </span>
+        </Link>
         <LogoutButton locale={locale} label={t.logout} />
       </div>
     </>
