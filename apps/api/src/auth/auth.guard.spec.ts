@@ -20,6 +20,7 @@ const editor: SessionUser = {
   name: "Editor",
   email: "editor@agency.test",
   role: Role.EDITOR,
+  emailVerifiedAt: null,
   agency: { id: "a1", name: "Agency", slug: "agency", plan: "FREE" },
 };
 
@@ -60,10 +61,11 @@ describe("AuthGuard", () => {
     );
   });
 
-  it("puts the logged-in user on the request", async () => {
+  it("puts the logged-in user and the login's id on the request", async () => {
     const { req, result } = setup()("anyLoggedIn", "pf_session=good-token");
     await expect(result).resolves.toBe(true);
     expect(req.user).toEqual(editor);
+    expect(req.sessionId).toBe("s1");
   });
 
   it("answers 403 FORBIDDEN when the role isn't allowed", async () => {

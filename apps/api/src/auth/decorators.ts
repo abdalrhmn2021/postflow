@@ -15,7 +15,8 @@ export const Public = () => SetMetadata(IS_PUBLIC, true);
 //   @Roles(Role.OWNER, Role.MANAGER)   schedule and publish
 export const Roles = (...roles: Role[]) => SetMetadata(ROLES, roles);
 
-export type RequestWithUser = Request & { user?: SessionUser };
+// sessionId: which login this request came with (change password keeps this one, ends the others).
+export type RequestWithUser = Request & { user?: SessionUser; sessionId?: string };
 
 // The logged-in user, put on the request by AuthGuard:  me(@CurrentUser() user: SessionUser)
 export const CurrentUser = createParamDecorator((_data: unknown, ctx: ExecutionContext): SessionUser => {
@@ -23,4 +24,11 @@ export const CurrentUser = createParamDecorator((_data: unknown, ctx: ExecutionC
   // Only reachable on a @Public() route by mistake - fail loudly rather than run with no user.
   if (!user) throw new Error("@CurrentUser() used on a route without a logged-in user (is it @Public?)");
   return user;
+});
+
+// The id of this request's login (a Session row), put on the request by AuthGuard.
+export const CurrentSessionId = createParamDecorator((_data: unknown, ctx: ExecutionContext): string => {
+  const id = ctx.switchToHttp().getRequest<RequestWithUser>().sessionId;
+  if (!id) throw new Error("@CurrentSessionId() used on a route without a logged-in user (is it @Public?)");
+  return id;
 });

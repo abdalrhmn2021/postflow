@@ -6,6 +6,7 @@ import { getDictionary, getLocale } from "@/i18n/get-dictionary";
 import { getSession } from "@/lib/server-api";
 import { LogoutButton } from "./LogoutButton";
 import { NavBar, NavLinks } from "./NavLinks";
+import { VerifyBanner } from "./VerifyBanner";
 
 // Every dashboard page: a top bar (logo, agency, who's logged in, language, log out), the sections
 // (home, clients, posts, team) and the page below.
@@ -32,6 +33,9 @@ export default async function DashboardLayout({ children }: LayoutProps<"/[lang]
           <Sections links={links} team={{ href: `/${locale}/dashboard/team`, label: dict.dashboard.nav.team }} />
         </Suspense>
       </header>
+      <Suspense fallback={null}>
+        <EmailReminder />
+      </Suspense>
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
     </div>
   );
@@ -74,4 +78,11 @@ async function UserBar() {
       </div>
     </>
   );
+}
+
+// "Confirm your email", until they do.
+async function EmailReminder() {
+  const [locale, dict, { user }] = await Promise.all([getLocale(), getDictionary(), getSession()]);
+  if (user.emailVerified) return null;
+  return <VerifyBanner locale={locale} email={user.email} t={dict.verify} errors={dict.errors} />;
 }

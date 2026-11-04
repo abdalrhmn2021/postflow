@@ -11,7 +11,7 @@ import { SessionService } from "./session.service.js";
 //   2. no valid login cookie  -> 401 UNAUTHENTICATED
 //   3. logged out, or the user no longer exists -> 401 (out at once, even with a token still in date)
 //   4. @Roles(...) and the user's role isn't listed -> 403 FORBIDDEN
-//   5. otherwise              -> req.user = the user, read fresh from the database
+//   5. otherwise              -> req.user = the user, read fresh from the database; req.sessionId = the login
 @Injectable()
 export class AuthGuard implements CanActivate {
   constructor(
@@ -28,7 +28,7 @@ export class AuthGuard implements CanActivate {
     const req = context.switchToHttp().getRequest<RequestWithUser>();
     const session = await this.sessions.verify(readCookie(req.headers.cookie, SESSION_COOKIE));
     const user = session ? await this.auth.findUserBySession(session) : null;
-    if (!user) throw notLoggedIn();
+    if (!session || !user) throw notLoggedIn();
 
     const roles = this.reflector.getAllAndOverride<Role[] | undefined>(ROLES, targets);
     if (roles?.length && !roles.includes(user.role)) {
@@ -36,6 +36,7 @@ export class AuthGuard implements CanActivate {
     }
 
     req.user = user;
+    req.sessionId = session.sessionId;
     return true;
   }
 }

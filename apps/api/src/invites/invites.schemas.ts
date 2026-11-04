@@ -17,6 +17,7 @@ export const acceptInviteSchema = z.object({
   token,
   name: z.string().trim().min(2, "At least 2 characters").max(80, "At most 80 characters"),
   password: z.string().min(8, "At least 8 characters").max(128, "At most 128 characters"),
+  lang: z.enum(["ar", "en"], "Must be ar or en").default("ar"), // the "confirm your email" mail
 });
 
 export type CreateInviteInput = z.infer<typeof createInviteSchema>;

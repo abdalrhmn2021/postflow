@@ -73,3 +73,31 @@ describe("RateLimitService.signup", () => {
     expect(keys).toEqual([]);
   });
 });
+
+describe("RateLimitService emails", () => {
+  it("emailTo() says false once an address had 3 emails this hour - it never throws", async () => {
+    await expect(new RateLimitService(fakeRedis(counted(3)), config(0)).emailTo("a@b.test")).resolves.toBe(true);
+    await expect(new RateLimitService(fakeRedis(counted(4)), config(0)).emailTo("a@b.test")).resolves.toBe(false);
+  });
+
+  it("forgotPassword() answers 429 TOO_MANY_EMAILS after 5 from one IP", async () => {
+    await expect(
+      new RateLimitService(fakeRedis(counted(5)), config(0)).forgotPassword("1.2.3.4"),
+    ).resolves.toBeUndefined();
+    const err = (await new RateLimitService(fakeRedis(counted(6)), config(0))
+      .forgotPassword("1.2.3.4")
+      .catch((e: unknown) => e)) as HttpException;
+    expect(err.getStatus()).toBe(429);
+    expect(err.getResponse()).toMatchObject({ code: "TOO_MANY_EMAILS" });
+  });
+
+  it("keeps each limit apart", async () => {
+    const keys: string[] = [];
+    const limits = new RateLimitService(fakeRedis(counted(1), keys), config(0));
+    await limits.forgotPassword("1.2.3.4");
+    await limits.emailTo("a@b.test");
+    await limits.verifyEmail("u1");
+    await limits.passwordCheck("u1");
+    expect(keys).toEqual(["forgot-ip:1.2.3.4", "mail-to:a@b.test", "verify-mail:u1", "password-check:u1"]);
+  });
+});

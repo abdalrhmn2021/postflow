@@ -134,3 +134,38 @@ test("logging out of every device from the account page", async ({ page, browser
   await phone.reload();
   await expect(phone).toHaveURL(/\/ar\/login/);
 });
+
+test("the confirm-email reminder, changing the password, and the forgot-password page", async ({ page }) => {
+  await signUp(page, "e");
+
+  // Not confirmed yet: the reminder, and "send it again".
+  await expect(page.getByText(`e@${RUN}.test`).first()).toBeVisible();
+  await page.getByRole("button", { name: "ابعت الرابط مرة ثانية" }).click();
+  await expect(page.getByText("بعتناه ✓ شوف إيميلك (والسبام).")).toBeVisible();
+
+  await page.getByRole("link", { name: "حسابي" }).click();
+  await page.fill("input[name=currentPassword]", "not-the-password");
+  await page.fill("input[name=newPassword]", "the-new-password");
+  await page.getByRole("button", { name: "غيّر كلمة السر" }).click();
+  await expect(page.getByText("كلمة السر الحالية غلط.")).toBeVisible();
+
+  await page.fill("input[name=currentPassword]", PASSWORD);
+  await page.fill("input[name=newPassword]", "the-new-password");
+  await page.getByRole("button", { name: "غيّر كلمة السر" }).click();
+  await expect(page.getByText("تغيّرت كلمة السر ✓")).toBeVisible();
+
+  await page.getByRole("button", { name: "تسجيل خروج" }).click();
+  await expect(page).toHaveURL(/\/ar\/login/);
+  await page.fill("input[name=email]", `e@${RUN}.test`);
+  await page.fill("input[name=password]", "the-new-password");
+  await page.getByRole("button", { name: "دخول" }).click();
+  await expect(page).toHaveURL(/\/ar\/dashboard/);
+
+  await page.getByRole("button", { name: "تسجيل خروج" }).click();
+  await expect(page).toHaveURL(/\/ar\/login/);
+  await page.getByRole("link", { name: "نسيت كلمة السر؟" }).click();
+  await expect(page).toHaveURL(/\/ar\/forgot-password/);
+  await page.fill("input[name=email]", `e@${RUN}.test`);
+  await page.getByRole("button", { name: "ابعتلي الرابط" }).click();
+  await expect(page.getByRole("heading", { name: "شوف إيميلك" })).toBeVisible();
+});

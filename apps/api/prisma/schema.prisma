@@ -45,6 +45,9 @@ model User {
   email        String   @unique
   name         String
   passwordHash String // never the password itself
+  // When they opened the link in the "confirm your email" mail (or reset their password by email).
+  // null = not confirmed yet: the dashboard shows a reminder.
+  emailVerifiedAt DateTime?
   role         Role     @default(EDITOR)
   agencyId     String
   agency       Agency   @relation(fields: [agencyId], references: [id], onDelete: Cascade)
@@ -55,6 +58,7 @@ model User {
   invitesSent Invite[]
   posts       Post[]
   sessions    Session[]
+  emailTokens EmailToken[]
 
   @@index([agencyId])
 }
@@ -71,6 +75,27 @@ model Session {
   createdAt DateTime @default(now())
 
   @@index([userId])
+  @@index([expiresAt]) // the worker's hourly clean-up
+}
+
+enum EmailTokenPurpose {
+  VERIFY_EMAIL // "confirm your email" - 24 hours
+  RESET_PASSWORD // "forgot password" - 1 hour
+}
+
+// A link sent by email: <site>/<lang>/verify-email/<secret> or /reset-password/<secret>.
+// Kept as a SHA-256 hash, like invites. Works once (deleted when used), and only the newest link of
+// each kind works: asking again deletes the older ones.
+model EmailToken {
+  id        String            @id @default(uuid())
+  userId    String
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purpose   EmailTokenPurpose
+  tokenHash String            @unique
+  expiresAt DateTime
+  createdAt DateTime          @default(now())
+
+  @@index([userId, purpose])
   @@index([expiresAt]) // the worker's hourly clean-up
 }
 

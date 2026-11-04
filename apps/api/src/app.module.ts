@@ -4,6 +4,7 @@ import { PrismaModule } from "./prisma/prisma.module.js";
 import { RedisModule } from "./redis/redis.module.js";
 import { HealthModule } from "./health/health.module.js";
 import { AuthModule } from "./auth/auth.module.js";
+import { MailModule } from "./mail/mail.module.js";
 import { BrandsModule } from "./brands/brands.module.js";
 import { InvitesModule } from "./invites/invites.module.js";
 import { StaffModule } from "./staff/staff.module.js";
@@ -24,6 +25,7 @@ import { AiModule } from "./ai/ai.module.js";
     PrismaModule,
     RedisModule,
     HealthModule,
+    MailModule,
     AuthModule,
     BrandsModule,
     InvitesModule,

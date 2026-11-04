@@ -17,6 +17,9 @@ async function bootstrap() {
   if (config.get("NODE_ENV", { infer: true }) === "production" && !config.get("META", { infer: true })) {
     new Logger("Startup").warn("META_APP_ID / META_APP_SECRET aren't set: scheduled posts will fail at their time");
   }
+  if (config.get("NODE_ENV", { infer: true }) === "production" && !config.get("MAIL", { infer: true })) {
+    new Logger("Startup").warn("BREVO_API_KEY / MAIL_FROM aren't set: emails (forgot password...) go to the log only");
+  }
 
   // RUN_WORKER=true: the publish worker in this same process (a free host has room for one service).
   // Its own Nest context - its own database and Redis connections - exactly as `npm run worker` runs it.

@@ -2,6 +2,8 @@
 
 **Social media scheduling for agencies.** An agency plans its clients' posts on one calendar, the client approves them from a link, and each post goes out on Facebook and Instagram at its time - automatically. Captions are drafted by AI in the brand's own voice.
 
+> **Improvements 2 (email)** - "forgot password" (a link by email, 1 hour, once; the new password ends every login), "confirm your email" after sign-up (24 hours; a reminder with "send again" on the dashboard), "change password" on the account page (needs the current one; ends the other logins). Links kept as hashes, only the newest of each kind works; the forgot form answers the same for any email and sends in the background; at most 3 emails an hour to one address. Sent through Brevo's HTTP API (`BREVO_API_KEY`, `MAIL_FROM`) - without a key, emails go to the API's log. Log out is a full page load now (Next.js kept the last person's pages in memory).
+>
 > **Improvements 1 (security)** - logins are stored (a `Session` row per device): logging out ends the login itself, so a copied cookie stops working at once; "log out of every device" on the new account page; sign-ups limited per IP (`SIGNUPS_PER_HOUR`, 10 in production); a client can't answer a post that's already out; expired logins cleaned up by the worker's hourly sweep.
 >
 > Status: **phase 7 (launch)** - ready to deploy: browser tests (Playwright: sign-up, login, language, a post to the calendar, the client's approval) in CI; `RUN_WORKER=true` runs the publish worker inside the API (one free service); `/api/health/ping` for an uptime pinger that doesn't wake the database; `render.yaml` and [DEPLOY.md](DEPLOY.md) for Vercel + Render.

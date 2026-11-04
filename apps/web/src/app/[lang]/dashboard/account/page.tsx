@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { getDictionary, getLocale } from "@/i18n/get-dictionary";
 import { getSession } from "@/lib/server-api";
+import { ChangePassword } from "./ChangePassword";
 import { LogoutEverywhere } from "./LogoutEverywhere";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -9,7 +10,6 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 // The logged-in person's own page: who they are, and their logins.
-// (Changing the password comes here next, with "forgot password".)
 export default async function AccountPage() {
   const dict = await getDictionary();
   return (
@@ -30,7 +30,7 @@ async function Account() {
   const t = dict.account;
   const rows = [
     [t.name, user.name],
-    [t.email, user.email],
+    [t.email, `${user.email} · ${user.emailVerified ? t.verified : t.notVerified}`],
     [t.role, dict.dashboard.roles[user.role]],
     [t.agency, agency.name],
   ];
@@ -52,7 +52,12 @@ async function Account() {
 
       <section className="rounded-2xl border border-line bg-card p-6">
         <h2 className="mb-4 font-semibold">{t.security}</h2>
-        <LogoutEverywhere locale={locale} t={t} errors={dict.errors} />
+        <div className="flex flex-col gap-8">
+          <ChangePassword t={t} hint={dict.auth.passwordHint} errors={dict.errors} fields={dict.fields} />
+          <div className="border-t border-line pt-6">
+            <LogoutEverywhere locale={locale} t={t} errors={dict.errors} />
+          </div>
+        </div>
       </section>
     </>
   );

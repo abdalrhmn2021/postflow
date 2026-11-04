@@ -37,7 +37,7 @@ export function AcceptForm({ locale, token, email, t, errors, fields }: Props) {
     try {
       await api<Session>("/invites/accept", {
         method: "POST",
-        body: { token, name: data.get("name"), password: data.get("password") },
+        body: { token, name: data.get("name"), password: data.get("password"), lang: locale },
       });
       router.replace(`/${locale}/dashboard`);
       router.refresh();

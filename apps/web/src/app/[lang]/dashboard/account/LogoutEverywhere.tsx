@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/FormError";
@@ -14,7 +13,6 @@ type Props = { locale: Locale; t: Dictionary["account"]; errors: Dictionary["err
 // "Log out of every device": POST /api/auth/logout-all ends every login of this person (this one too),
 // after a second click to confirm. Then to the login page.
 export function LogoutEverywhere({ locale, t, errors }: Props) {
-  const router = useRouter();
   const [confirming, setConfirming] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,8 +22,7 @@ export function LogoutEverywhere({ locale, t, errors }: Props) {
     setError(null);
     try {
       await api("/auth/logout-all", { method: "POST" });
-      router.replace(`/${locale}/login`);
-      router.refresh();
+      window.location.replace(`/${locale}/login`); // a clean page load, like LogoutButton
     } catch (err) {
       setError(errorText(err, errors));
       setLoading(false);

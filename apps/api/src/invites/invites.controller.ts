@@ -6,6 +6,7 @@ import type { Env } from "../config/env.js";
 import type { SessionUser } from "../auth/auth.service.js";
 import { CurrentUser, Public, Roles } from "../auth/decorators.js";
 import { SESSION_COOKIE, sessionCookieOptions } from "../auth/session.js";
+import { AccountService } from "../auth/account.service.js";
 import { SessionService } from "../auth/session.service.js";
 import { ZodValidationPipe } from "../common/zod-validation.pipe.js";
 import {
@@ -25,6 +26,7 @@ export class InvitesController {
   constructor(
     private readonly invites: InvitesService,
     private readonly sessions: SessionService,
+    private readonly account: AccountService,
     config: ConfigService<Env, true>,
   ) {
     this.production = config.get("NODE_ENV", { infer: true }) === "production";
@@ -69,6 +71,8 @@ export class InvitesController {
   ) {
     const session = await this.invites.accept(body);
     res.cookie(SESSION_COOKIE, await this.sessions.start(session.user.id), sessionCookieOptions(this.production));
+    // The invite came by WhatsApp or a copied link, not by email: the address isn't confirmed yet.
+    this.account.sendVerificationLater(session.user, body.lang);
     return session;
   }
 }

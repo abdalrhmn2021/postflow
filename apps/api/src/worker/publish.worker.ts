@@ -79,7 +79,7 @@ export class PublishWorker implements OnApplicationBootstrap, OnModuleDestroy {
     await this.queueScheduled();
     await this.failStuck();
     await this.reencryptTokens();
-    await this.deleteExpiredSessions();
+    await this.deleteExpired();
   }
 
   // The safety net: every scheduled post gets its job, even one scheduled while Redis was down, or
@@ -143,11 +143,16 @@ export class PublishWorker implements OnApplicationBootstrap, OnModuleDestroy {
     }
   }
 
-  // Logins whose 7 days are over: AuthGuard already refuses them, this just keeps the table small.
-  private async deleteExpiredSessions() {
+  // Logins whose 7 days are over, and email links whose time is over: nothing accepts them any more,
+  // this just keeps the tables small.
+  private async deleteExpired() {
     try {
-      const { count } = await this.prisma.session.deleteMany({ where: { expiresAt: { lte: new Date() } } });
-      if (count > 0) this.logger.log(`Sweep: ${count} expired login(s) deleted`);
+      const now = new Date();
+      const sessions = await this.prisma.session.deleteMany({ where: { expiresAt: { lte: now } } });
+      const links = await this.prisma.emailToken.deleteMany({ where: { expiresAt: { lte: now } } });
+      if (sessions.count + links.count > 0) {
+        this.logger.log(`Sweep: ${sessions.count} expired login(s), ${links.count} expired email link(s) deleted`);
+      }
     } catch (err) {
       this.logger.warn(`Deleting expired logins failed (next try in an hour): ${(err as Error).message}`);
     }

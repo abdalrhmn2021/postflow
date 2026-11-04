@@ -113,6 +113,27 @@ describe("validateEnv", () => {
     );
   });
 
+  it("email: Brevo with a sender, or the log", () => {
+    expect(validateEnv(base).MAIL).toBeUndefined();
+    expect(validateEnv({ ...base, BREVO_API_KEY: "", MAIL_FROM: "" }).MAIL).toBeUndefined();
+    expect(validateEnv({ ...base, BREVO_API_KEY: "xkeysib-0123456789abcdef", MAIL_FROM: "me@gmail.com" }).MAIL).toEqual(
+      {
+        brevoApiKey: "xkeysib-0123456789abcdef",
+        from: "me@gmail.com",
+        fromName: "PostFlow",
+      },
+    );
+    expect(() => validateEnv({ ...base, BREVO_API_KEY: "xkeysib-0123456789abcdef" })).toThrow(/MAIL_FROM: required/);
+    expect(() => validateEnv({ ...base, MAIL_FROM: "not-an-email" })).toThrow(/MAIL_FROM must be an email/);
+  });
+
+  it("SIGNUPS_PER_HOUR: 10 in production, off elsewhere, unless set", () => {
+    const prod = { ...base, NODE_ENV: "production", JWT_SECRET: "x".repeat(32), TOKEN_ENCRYPTION_KEY: KEY };
+    expect(validateEnv(base).SIGNUPS_PER_HOUR).toBe(0);
+    expect(validateEnv(prod).SIGNUPS_PER_HOUR).toBe(10);
+    expect(validateEnv({ ...prod, SIGNUPS_PER_HOUR: "3" }).SIGNUPS_PER_HOUR).toBe(3);
+  });
+
   it("RUN_WORKER: off unless it's exactly true", () => {
     expect(validateEnv(base).RUN_WORKER).toBe(false);
     expect(validateEnv({ ...base, RUN_WORKER: "true" }).RUN_WORKER).toBe(true);

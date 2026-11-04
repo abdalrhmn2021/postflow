@@ -5,12 +5,16 @@ import type { NestExpressApplication } from "@nestjs/platform-express";
 import type { App } from "supertest/types.js";
 import { AppModule } from "../src/app.module.js";
 import { setupApp } from "../src/app.setup.js";
+import { Mailer } from "../src/mail/mailer.js";
+import { FakeMailer } from "./fake-mailer.js";
 
 // The whole API, set up exactly like main.ts, for the e2e tests. Runs against a real PostgreSQL and
 // Redis (DATABASE_URL and REDIS_URL from the environment or apps/api/.env).
 // `override` swaps a provider, e.g. a Redis that is down.
+// Emails never leave: they go to a FakeMailer - app.get(Mailer) as FakeMailer to read them.
 export async function startApp(override?: (b: ReturnType<typeof Test.createTestingModule>) => void) {
   const builder = Test.createTestingModule({ imports: [AppModule] });
+  builder.overrideProvider(Mailer).useValue(new FakeMailer());
   override?.(builder);
   const moduleRef = await builder.compile();
   const app = setupApp(moduleRef.createNestApplication<NestExpressApplication>());

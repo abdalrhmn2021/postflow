@@ -84,6 +84,13 @@ const envSchema = z.object({
 
   // "true": the API process runs the publish worker too - one service instead of two, for a free
   // host. Leave it off (the default) when the worker runs as its own service (npm run worker).
+  // Emails ("forgot password", "confirm your email") through Brevo's API (brevo.com, free: 300 a day):
+  // Brevo -> SMTP & API -> API Keys -> Generate. MAIL_FROM is the sender, verified in Brevo first.
+  // Empty = the emails are written to the log instead of sent (fine in development).
+  BREVO_API_KEY: z.preprocess(emptyIsUnset, z.string().min(20, "BREVO_API_KEY looks too short").optional()),
+  MAIL_FROM: z.preprocess(emptyIsUnset, z.email("MAIL_FROM must be an email address").optional()),
+  MAIL_FROM_NAME: z.preprocess(emptyIsUnset, z.string().max(60).default("PostFlow")),
+
   // Sign-ups allowed per hour from one IP (fake agencies). 0 = no limit. Not set: 10 in production,
   // no limit in development and tests (they sign up many agencies from localhost).
   SIGNUPS_PER_HOUR: z.preprocess(emptyIsUnset, z.coerce.number().int().min(0).max(1000).optional()),
@@ -158,6 +165,8 @@ export function parseCloudinaryUrl(value: string): CloudinaryConfig | null {
   return { cloudName, apiKey, apiSecret };
 }
 
+export type MailConfig = { brevoApiKey: string; from: string; fromName: string };
+
 const DEV_JWT_SECRET = "postflow-development-only-secret-do-not-use-in-production";
 // 32 bytes, base64. Only ever used when NODE_ENV isn't production.
 const DEV_TOKEN_KEY = Buffer.from("postflow-dev-token-key-not-prod!").toString("base64");
@@ -167,8 +176,17 @@ const DEFAULT_REDIS_PREFIX = { development: "dev", test: "test", production: "pr
 type Parsed = z.infer<typeof envSchema>;
 export type Env = Omit<
   Parsed,
-  "JWT_SECRET" | "TOKEN_ENCRYPTION_KEY" | "META_APP_ID" | "META_APP_SECRET" | "REDIS_PREFIX" | "SIGNUPS_PER_HOUR"
+  | "JWT_SECRET"
+  | "TOKEN_ENCRYPTION_KEY"
+  | "META_APP_ID"
+  | "META_APP_SECRET"
+  | "REDIS_PREFIX"
+  | "SIGNUPS_PER_HOUR"
+  | "BREVO_API_KEY"
+  | "MAIL_FROM"
+  | "MAIL_FROM_NAME"
 > & {
+  MAIL: MailConfig | undefined; // undefined = emails go to the log
   SIGNUPS_PER_HOUR: number; // 0 = no limit
   JWT_SECRET: string;
   REDIS_PREFIX: string; // never empty: "dev", "test", "prod" or the value set
@@ -183,8 +201,18 @@ export function validateEnv(raw: Record<string, unknown>): Env {
     const problems = result.error.issues.map((i) => `  - ${i.path.join(".") || "env"}: ${i.message}`);
     throw new Error(`Invalid environment variables:\n${problems.join("\n")}\nSee .env.example.`);
   }
-  const { JWT_SECRET, TOKEN_ENCRYPTION_KEY, META_APP_ID, META_APP_SECRET, REDIS_PREFIX, SIGNUPS_PER_HOUR, ...env } =
-    result.data;
+  const {
+    JWT_SECRET,
+    TOKEN_ENCRYPTION_KEY,
+    META_APP_ID,
+    META_APP_SECRET,
+    REDIS_PREFIX,
+    SIGNUPS_PER_HOUR,
+    BREVO_API_KEY,
+    MAIL_FROM,
+    MAIL_FROM_NAME,
+    ...env
+  } = result.data;
   const production = env.NODE_ENV === "production";
 
   const problems: string[] = [];
@@ -193,6 +221,7 @@ export function validateEnv(raw: Record<string, unknown>): Env {
   if (Boolean(META_APP_ID) !== Boolean(META_APP_SECRET)) {
     problems.push("META_APP_ID and META_APP_SECRET: set both, or neither");
   }
+  if (BREVO_API_KEY && !MAIL_FROM) problems.push("MAIL_FROM: required with BREVO_API_KEY (the sender's email)");
   if (problems.length > 0) {
     throw new Error(`Invalid environment variables:\n${problems.map((p) => `  - ${p}`).join("\n")}\nSee .env.example.`);
   }
@@ -201,6 +230,10 @@ export function validateEnv(raw: Record<string, unknown>): Env {
     ...env,
     REDIS_PREFIX: REDIS_PREFIX ?? DEFAULT_REDIS_PREFIX[env.NODE_ENV],
     SIGNUPS_PER_HOUR: SIGNUPS_PER_HOUR ?? (production ? 10 : 0),
+    MAIL:
+      BREVO_API_KEY && MAIL_FROM
+        ? { brevoApiKey: BREVO_API_KEY, from: MAIL_FROM, fromName: MAIL_FROM_NAME }
+        : undefined,
     JWT_SECRET: JWT_SECRET ?? DEV_JWT_SECRET,
     TOKEN_ENCRYPTION_KEY: TOKEN_ENCRYPTION_KEY ?? DEV_TOKEN_KEY,
     META:

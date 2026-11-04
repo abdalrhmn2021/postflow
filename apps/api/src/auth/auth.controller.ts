@@ -4,6 +4,7 @@ import type { Request, Response } from "express";
 import { ZodValidationPipe } from "../common/zod-validation.pipe.js";
 import type { Env } from "../config/env.js";
 import { loginSchema, registerSchema, type LoginInput, type RegisterInput } from "./auth.schemas.js";
+import { AccountService } from "./account.service.js";
 import { AuthService, toSession, type SessionUser } from "./auth.service.js";
 import { CurrentUser, Public } from "./decorators.js";
 import { RateLimitService } from "./rate-limit.service.js";
@@ -19,6 +20,7 @@ export class AuthController {
     private readonly auth: AuthService,
     private readonly sessions: SessionService,
     private readonly limits: RateLimitService,
+    private readonly account: AccountService,
     config: ConfigService<Env, true>,
   ) {
     this.production = config.get("NODE_ENV", { infer: true }) === "production";
@@ -36,6 +38,7 @@ export class AuthController {
     await this.limits.signup(req.ip ?? "unknown"); // before the database and the slow password hash
     const session = await this.auth.register(body);
     await this.setCookie(res, session.user.id);
+    this.account.sendVerificationLater(session.user, body.lang); // "confirm your email"
     return session;
   }
 

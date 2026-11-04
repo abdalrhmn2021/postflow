@@ -21,6 +21,7 @@ const sessionSelect = {
   name: true,
   email: true,
   role: true,
+  emailVerifiedAt: true, // the dashboard reminds them to confirm it
   agency: { select: { id: true, name: true, slug: true, plan: true } },
 } satisfies Prisma.UserSelect;
 
@@ -28,8 +29,8 @@ const sessionSelect = {
 export type SessionUser = Prisma.UserGetPayload<{ select: typeof sessionSelect }>;
 
 // { user, agency } - the same shape for register, login and /me.
-export function toSession({ id, name, email, role, agency }: SessionUser) {
-  return { user: { id, name, email, role }, agency };
+export function toSession({ id, name, email, role, emailVerifiedAt, agency }: SessionUser) {
+  return { user: { id, name, email, role, emailVerified: emailVerifiedAt !== null }, agency };
 }
 
 // Which unique column a Prisma "unique constraint failed" (P2002) error is about, if any.
