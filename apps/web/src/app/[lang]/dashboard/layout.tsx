@@ -3,6 +3,7 @@ import { Logo } from "@/components/Logo";
 import { LanguageSwitch } from "@/components/ui/LanguageSwitch";
 import { getDictionary, getLocale } from "@/i18n/get-dictionary";
 import { getSession } from "@/lib/server-api";
+import { LogoutAllButton } from "./LogoutAllButton";
 import { LogoutButton } from "./LogoutButton";
 import { NavBar, NavLinks } from "./NavLinks";
 
@@ -60,6 +61,7 @@ async function UserBar() {
         <div className="hidden text-end leading-tight sm:block">
           <p className="text-sm font-medium">{user.name}</p>
           <p className="text-xs text-muted">{t.roles[user.role]}</p>
+          <LogoutAllButton locale={locale} label={t.logoutAll} confirmLabel={t.logoutAllConfirm} />
         </div>
         <LogoutButton locale={locale} label={t.logout} />
       </div>

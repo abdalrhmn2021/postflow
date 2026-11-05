@@ -1,13 +1,14 @@
 import type { INestApplication } from "@nestjs/common";
 import request from "supertest";
 import type { App } from "supertest/types.js";
-import { LOGIN_ATTEMPTS } from "../src/auth/login-limit.service.js";
+import { AuthLimits, DEFAULT_AUTH_LIMITS, LOGIN_ATTEMPTS } from "../src/auth/auth-limits.service.js";
 import { PrismaService } from "../src/prisma/prisma.service.js";
 import { RedisService } from "../src/redis/redis.service.js";
 import { startApp, uniqueRun } from "./app.js";
 
 const RUN = uniqueRun();
 const EMAIL = `owner@${RUN}.test`;
+const TARGET = `target@${RUN}.test`; // the account someone tries to guess the password of
 const PASSWORD = "a-long-password";
 
 // Each test logs in from its own made-up IP (X-Forwarded-For, trusted from localhost),
@@ -39,6 +40,7 @@ describe("login, me and logout", () => {
   afterAll(async () => {
     await app?.get(PrismaService).agency.deleteMany({ where: { slug: { startsWith: RUN } } });
     await Promise.all(ips.map((ip) => app?.get(RedisService).client.del(`login-attempts:${ip}`)));
+    await Promise.all([EMAIL, TARGET].map((email) => app?.get(AuthLimits).loginSucceeded(email)));
     await app?.close();
   });
 
@@ -87,6 +89,49 @@ describe("login, me and logout", () => {
 
     // Another visitor is not affected.
     await login({ email: EMAIL, password: PASSWORD }).expect(200);
+  });
+
+  it("stops guessing one account's password from many IPs with 429 TOO_MANY_ACCOUNT_ATTEMPTS", async () => {
+    await request(app.getHttpServer())
+      .post("/api/auth/register")
+      .send({ agencyName: "Target", slug: `${RUN}-target`, name: "Target", email: TARGET, password: PASSWORD })
+      .expect(201);
+
+    for (let i = 0; i < DEFAULT_AUTH_LIMITS.loginPerAccount.max; i++) {
+      await login({ email: TARGET, password: `guess-${i}` }).expect(401); // a new IP every time
+    }
+    const blocked = await login({ email: TARGET, password: PASSWORD }).expect(429);
+    expect(blocked.body.code).toBe("TOO_MANY_ACCOUNT_ATTEMPTS");
+    expect(blocked.body.retryAfter).toBeGreaterThan(0);
+
+    // Other accounts log in as usual.
+    await login({ email: EMAIL, password: PASSWORD }).expect(200);
+  });
+
+  it("logout-all ends the login on every device, and a new login works", async () => {
+    const laptop = request.agent(app.getHttpServer());
+    const phone = request.agent(app.getHttpServer());
+    await laptop.post("/api/auth/login").set("X-Forwarded-For", newIp()).send({ email: EMAIL, password: PASSWORD });
+    const phoneLogin = await phone
+      .post("/api/auth/login")
+      .set("X-Forwarded-For", newIp())
+      .send({ email: EMAIL, password: PASSWORD });
+    const phoneCookie = sessionCookie(phoneLogin)!.split(";")[0];
+    await phone.get("/api/auth/me").expect(200);
+
+    const res = await laptop.post("/api/auth/logout-all").expect(204);
+    expect(sessionCookie(res)).toMatch(/^pf_session=;/); // the laptop's cookie is removed
+
+    await phone.get("/api/auth/me").expect(401); // the other device is out too
+    // The phone's old token, sent again by someone who copied it, doesn't work either.
+    await request(app.getHttpServer()).get("/api/auth/me").set("Cookie", phoneCookie).expect(401);
+
+    await phone.post("/api/auth/login").set("X-Forwarded-For", newIp()).send({ email: EMAIL, password: PASSWORD });
+    await phone.get("/api/auth/me").expect(200);
+  });
+
+  it("logout-all needs a login", async () => {
+    await request(app.getHttpServer()).post("/api/auth/logout-all").expect(401);
   });
 
   it("GET /me tells who is signed in, and logout ends it", async () => {

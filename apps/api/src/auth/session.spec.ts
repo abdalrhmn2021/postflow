@@ -18,13 +18,24 @@ describe("SessionService", () => {
   const secret = "a-test-secret-that-is-at-least-32-characters-long";
   const sessions = new SessionService(new ConfigService({ JWT_SECRET: secret }) as never);
 
-  it("gives back the user id from a token it signed", async () => {
-    expect(await sessions.verify(await sessions.sign("user-1"))).toBe("user-1");
+  const user = { id: "user-1", sessionVersion: 3 };
+
+  it("gives back the user id and session version from a token it signed", async () => {
+    expect(await sessions.verify(await sessions.sign(user))).toEqual({ userId: "user-1", version: 3 });
+  });
+
+  it("reads a token made before versions existed as version 0, so nobody is logged out by the update", async () => {
+    const old = await new SignJWT()
+      .setProtectedHeader({ alg: "HS256" })
+      .setSubject("user-1")
+      .setExpirationTime("1h")
+      .sign(new TextEncoder().encode(secret));
+    expect(await sessions.verify(old)).toEqual({ userId: "user-1", version: 0 });
   });
 
   it("rejects a token signed with another secret", async () => {
     const other = new SessionService(new ConfigService({ JWT_SECRET: `${secret}-other` }) as never);
-    expect(await sessions.verify(await other.sign("user-1"))).toBeNull();
+    expect(await sessions.verify(await other.sign(user))).toBeNull();
   });
 
   it("rejects an expired token, a changed token and garbage", async () => {
@@ -35,7 +46,7 @@ describe("SessionService", () => {
       .sign(new TextEncoder().encode(secret));
     expect(await sessions.verify(expired)).toBeNull();
 
-    const token = await sessions.sign("user-1");
+    const token = await sessions.sign(user);
     expect(await sessions.verify(`${token.slice(0, -2)}xx`)).toBeNull();
     expect(await sessions.verify("not-a-token")).toBeNull();
     expect(await sessions.verify(null)).toBeNull();

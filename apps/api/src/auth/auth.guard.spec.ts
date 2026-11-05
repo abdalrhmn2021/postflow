@@ -20,12 +20,18 @@ const editor: SessionUser = {
   name: "Editor",
   email: "editor@agency.test",
   role: Role.EDITOR,
+  sessionVersion: 2,
   agency: { id: "a1", name: "Agency", slug: "agency", plan: "FREE" },
 };
 
 // The guard with a token checker and a user lookup we control.
+// "good-token" is for the user's current session version, "old-token" for the one before.
 function setup(user: SessionUser | null = editor) {
-  const sessions = { verify: (t: string | null) => Promise.resolve(t === "good-token" ? "u1" : null) };
+  const tokens: Record<string, { userId: string; version: number }> = {
+    "good-token": { userId: "u1", version: 2 },
+    "old-token": { userId: "u1", version: 1 },
+  };
+  const sessions = { verify: (t: string | null) => Promise.resolve((t && tokens[t]) ?? null) };
   const auth = { findSessionUser: () => Promise.resolve(user) };
   const guard = new AuthGuard(new Reflector(), sessions as SessionService, auth as unknown as AuthService);
 
@@ -55,6 +61,10 @@ describe("AuthGuard", () => {
     await expect(setup(null)("anyLoggedIn", "pf_session=good-token").result).rejects.toBeInstanceOf(
       UnauthorizedException,
     );
+  });
+
+  it("refuses a token from before the user logged out of all devices", async () => {
+    await expect(setup()("anyLoggedIn", "pf_session=old-token").result).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
   it("puts the logged-in user on the request", async () => {

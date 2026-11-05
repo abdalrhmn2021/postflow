@@ -59,7 +59,7 @@ postflow/
 │       │   ├── prisma/      database client
 │       │   ├── redis/       Redis connection
 │       │   ├── health/      GET /api/health
-│       │   ├── auth/        sign-up, login, /me, logout; AuthGuard + @Public / @Roles / @CurrentUser
+│       │   ├── auth/        sign-up, login, /me, logout, logout-all; limits; AuthGuard + @Public / @Roles / @CurrentUser
 │       │   ├── brands/      an agency's clients: /api/brands, editors per brand
 │       │   ├── invites/     staff invites: the owner makes a link, the person opens it and makes an account
 │       │   ├── staff/       the agency's people: /api/staff, change a role, remove someone

@@ -2,7 +2,7 @@ import { ConflictException, Injectable, NotFoundException } from "@nestjs/common
 import { ConfigService } from "@nestjs/config";
 import { Prisma } from "../generated/prisma/client.js";
 import type { Env } from "../config/env.js";
-import { AuthService, toSession, uniqueViolation, type SessionUser } from "../auth/auth.service.js";
+import { AuthService, uniqueViolation, type SessionUser } from "../auth/auth.service.js";
 import { hashPassword } from "../auth/password.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { hashInviteToken, INVITE_DAYS, inviteLink, newInviteToken } from "./invite-token.js";
@@ -85,8 +85,8 @@ export class InvitesService {
     return rest;
   }
 
-  // Makes the account and returns { user, agency } like sign-up; the controller then logs them in.
-  async accept({ token, name, password }: AcceptInviteInput) {
+  // Makes the account and returns the new user; the controller logs them in and answers like sign-up.
+  async accept({ token, name, password }: AcceptInviteInput): Promise<SessionUser> {
     const tokenHash = hashInviteToken(token);
     const found = await this.prisma.invite.findUnique({ where: { tokenHash }, select: { expiresAt: true } });
     if (!found || found.expiresAt <= new Date()) throw inviteInvalid();
@@ -109,7 +109,7 @@ export class InvitesService {
 
       const user = await this.auth.findSessionUser(userId);
       if (!user) throw inviteInvalid(); // the agency was deleted in that same moment
-      return toSession(user);
+      return user;
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2025") throw inviteInvalid();
       // The email got an account after the invite was made (e.g. signed up its own agency):

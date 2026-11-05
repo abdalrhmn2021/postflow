@@ -20,6 +20,7 @@ const sessionSelect = {
   name: true,
   email: true,
   role: true,
+  sessionVersion: true, // checked against the token's on every request - never sent to the website
   agency: { select: { id: true, name: true, slug: true, plan: true } },
 } satisfies Prisma.UserSelect;
 
@@ -48,8 +49,8 @@ let dummyHash: Promise<string> | undefined;
 export class AuthService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // A new agency and its owner, in one step.
-  async register(input: RegisterInput) {
+  // A new agency and its owner, in one step. The controller logs them in and answers toSession().
+  async register(input: RegisterInput): Promise<SessionUser> {
     if (RESERVED_SLUGS.has(input.slug)) throw slugTaken();
 
     // Checked first so the person gets the right message ...
@@ -75,7 +76,7 @@ export class AuthService {
         },
         select: sessionSelect,
       });
-      return toSession(user);
+      return user;
     } catch (err) {
       // ... and the unique indexes are the real guard: two sign-ups with the same email at the same
       // moment both pass the check above, but only one INSERT succeeds.
@@ -86,7 +87,7 @@ export class AuthService {
     }
   }
 
-  async login(input: LoginInput) {
+  async login(input: LoginInput): Promise<SessionUser> {
     const user = await this.prisma.user.findUnique({
       where: { email: input.email },
       select: { ...sessionSelect, passwordHash: true },
@@ -95,7 +96,17 @@ export class AuthService {
     if (!user || !ok) throw invalidCredentials();
 
     const { passwordHash: _, ...rest } = user;
-    return toSession(rest);
+    return rest;
+  }
+
+  // Ends every login of this user, on every device: their tokens carry the old number.
+  // Returns the user with the new number, to log the current device back in when that's wanted.
+  async endAllSessions(userId: string): Promise<SessionUser> {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { sessionVersion: { increment: 1 } },
+      select: sessionSelect,
+    });
   }
 
   // Read on every request by AuthGuard, never taken from the token: a deleted user is logged out

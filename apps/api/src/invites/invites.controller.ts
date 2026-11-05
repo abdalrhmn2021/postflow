@@ -1,9 +1,10 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Post, Res } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, Req, Res } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import type { Response } from "express";
+import type { Request, Response } from "express";
 import { Role } from "../generated/prisma/client.js";
 import type { Env } from "../config/env.js";
-import type { SessionUser } from "../auth/auth.service.js";
+import { AuthLimits } from "../auth/auth-limits.service.js";
+import { toSession, type SessionUser } from "../auth/auth.service.js";
 import { CurrentUser, Public, Roles } from "../auth/decorators.js";
 import { SESSION_COOKIE, sessionCookieOptions } from "../auth/session.js";
 import { SessionService } from "../auth/session.service.js";
@@ -25,6 +26,7 @@ export class InvitesController {
   constructor(
     private readonly invites: InvitesService,
     private readonly sessions: SessionService,
+    private readonly limits: AuthLimits,
     config: ConfigService<Env, true>,
   ) {
     this.production = config.get("NODE_ENV", { infer: true }) === "production";
@@ -60,15 +62,17 @@ export class InvitesController {
   }
 
   // POST /api/invites/accept { token, name, password } -> 201 { user, agency } + login cookie
-  // 400 VALIDATION_ERROR | 404 INVITE_INVALID | 409 EMAIL_TAKEN
+  // 400 VALIDATION_ERROR | 404 INVITE_INVALID | 409 EMAIL_TAKEN | 429 TOO_MANY_SIGNUPS
   @Public()
   @Post("accept")
   async accept(
     @Body(new ZodValidationPipe(acceptInviteSchema)) body: AcceptInviteInput,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const session = await this.invites.accept(body);
-    res.cookie(SESSION_COOKIE, await this.sessions.sign(session.user.id), sessionCookieOptions(this.production));
-    return session;
+    await this.limits.signup(req.ip ?? "unknown"); // a new account, like a sign-up
+    const user = await this.invites.accept(body);
+    res.cookie(SESSION_COOKIE, await this.sessions.sign(user), sessionCookieOptions(this.production));
+    return toSession(user);
   }
 }

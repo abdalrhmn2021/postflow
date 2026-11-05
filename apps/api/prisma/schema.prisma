@@ -40,16 +40,19 @@ model Agency {
 }
 
 model User {
-  id           String   @id @default(uuid())
+  id             String   @id @default(uuid())
   // Unique across the whole site: the login form asks for email + password only, not the agency.
-  email        String   @unique
-  name         String
-  passwordHash String // never the password itself
-  role         Role     @default(EDITOR)
-  agencyId     String
-  agency       Agency   @relation(fields: [agencyId], references: [id], onDelete: Cascade)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  email          String   @unique
+  name           String
+  passwordHash   String // never the password itself
+  role           Role     @default(EDITOR)
+  // Inside every login token. Adding 1 ends every login of this user at once, on every device
+  // ("log out of all devices", a new password): tokens made with an older number are refused.
+  sessionVersion Int      @default(0)
+  agencyId       String
+  agency         Agency   @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   brands      BrandMember[]
   invitesSent Invite[]
