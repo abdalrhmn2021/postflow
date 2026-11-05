@@ -3,6 +3,7 @@ import { APP_GUARD } from "@nestjs/core";
 import { AuthGuard } from "./auth.guard.js";
 import { AuthController } from "./auth.controller.js";
 import { AuthService } from "./auth.service.js";
+import { EmailAuthService } from "./email-auth.service.js";
 import { RateLimiter } from "../common/rate-limiter.js";
 import { AUTH_LIMITS, AuthLimits, DEFAULT_AUTH_LIMITS } from "./auth-limits.service.js";
 import { SessionService } from "./session.service.js";
@@ -11,6 +12,7 @@ import { SessionService } from "./session.service.js";
   controllers: [AuthController],
   providers: [
     AuthService,
+    EmailAuthService,
     SessionService,
     RateLimiter,
     AuthLimits,
@@ -18,7 +20,8 @@ import { SessionService } from "./session.service.js";
     // AuthGuard on every route of every module - routes opt out with @Public().
     { provide: APP_GUARD, useClass: AuthGuard },
   ],
-  // invites: read the new user, log them in, and count the new account like a sign-up
-  exports: [AuthService, SessionService, AuthLimits],
+  // invites: read the new user, log them in, count the new account like a sign-up, and send the
+  // confirmation email
+  exports: [AuthService, SessionService, AuthLimits, EmailAuthService],
 })
 export class AuthModule {}

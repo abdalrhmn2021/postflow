@@ -36,6 +36,10 @@ services:
         sync: false
       - key: GEMINI_API_KEY
         sync: false
+      - key: BREVO_API_KEY
+        sync: false # Brevo -> SMTP & API -> API keys (DEPLOY.md, "Emails")
+      - key: EMAIL_FROM
+        sync: false # the sender verified in Brevo
       - key: META_APP_ID
         sync: false # later, with the Meta app
       - key: META_APP_SECRET

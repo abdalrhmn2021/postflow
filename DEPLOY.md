@@ -43,6 +43,20 @@ Render's free services sleep after 15 minutes without visits - a sleeping worker
 **UptimeRobot** (free) -> New monitor -> HTTP(s) -> `https://<api>.onrender.com/api/health/ping` -> every 5 minutes.
 `/ping` touches nothing else, so the database can still sleep (Neon's free plan counts awake time).
 
+## Emails (Brevo)
+
+Password reset and email confirmation. Without them the API runs, but nobody gets those emails.
+
+1. **brevo.com** -> sign up (free: 300 emails a day).
+2. **Senders, domains & dedicated IPs -> Senders -> Add a sender**: your email address, then the code Brevo emails you.
+3. **SMTP & API -> API keys -> Generate a new API key**.
+4. On Render: `BREVO_API_KEY` = that key, `EMAIL_FROM` = the sender's address. Save (the service restarts).
+5. Try it: on the site, "Forgot your password?" with your own email.
+
+A free address (gmail.com ...) can't be authenticated, so Brevo sends from `<name>@<number>.brevosend.com`
+instead, and some emails may land in spam. Replies still go to `EMAIL_FROM`. With a domain of your own,
+authenticate it in Brevo (Senders, domains -> Domains), put an address on it in `EMAIL_FROM`, and that's all.
+
 ## 5. Meta (last)
 
 Create the Meta app, add `https://<site>.vercel.app/api/meta/callback` to its Valid OAuth Redirect URIs, and set

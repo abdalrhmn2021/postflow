@@ -1,10 +1,11 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Post, Req, Res } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Logger, Param, Post, Req, Res } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { Request, Response } from "express";
 import { Role } from "../generated/prisma/client.js";
 import type { Env } from "../config/env.js";
 import { AuthLimits } from "../auth/auth-limits.service.js";
 import { toSession, type SessionUser } from "../auth/auth.service.js";
+import { EmailAuthService } from "../auth/email-auth.service.js";
 import { CurrentUser, Public, Roles } from "../auth/decorators.js";
 import { SESSION_COOKIE, sessionCookieOptions } from "../auth/session.js";
 import { SessionService } from "../auth/session.service.js";
@@ -21,12 +22,14 @@ import { InvitesService } from "./invites.service.js";
 // opening and accepting a link is public - the person has no account yet.
 @Controller("invites")
 export class InvitesController {
+  private readonly logger = new Logger(InvitesController.name);
   private readonly production: boolean;
 
   constructor(
     private readonly invites: InvitesService,
     private readonly sessions: SessionService,
     private readonly limits: AuthLimits,
+    private readonly emailAuth: EmailAuthService,
     config: ConfigService<Env, true>,
   ) {
     this.production = config.get("NODE_ENV", { infer: true }) === "production";
@@ -73,6 +76,8 @@ export class InvitesController {
     await this.limits.signup(req.ip ?? "unknown"); // a new account, like a sign-up
     const user = await this.invites.accept(body);
     res.cookie(SESSION_COOKIE, await this.sessions.sign(user), sessionCookieOptions(this.production));
+    // The invite came by WhatsApp or the like, not by email: the address still needs confirming.
+    void this.emailAuth.sendVerification(user, body.lang).catch((err: Error) => this.logger.error(err.message));
     return toSession(user);
   }
 }

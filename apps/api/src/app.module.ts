@@ -13,6 +13,7 @@ import { PostsModule } from "./posts/posts.module.js";
 import { PublishModule } from "./publish/publish.module.js";
 import { ReviewModule } from "./review/review.module.js";
 import { AiModule } from "./ai/ai.module.js";
+import { MailModule } from "./mail/mail.module.js";
 
 // The HTTP API. Each feature gets its own module here as the phases add them
 // (phase 1: AuthModule, BrandsModule, InvitesModule, StaffModule; phase 2: PostsModule, MediaModule;
@@ -23,6 +24,7 @@ import { AiModule } from "./ai/ai.module.js";
     AppConfigModule,
     PrismaModule,
     RedisModule,
+    MailModule,
     HealthModule,
     AuthModule,
     BrandsModule,

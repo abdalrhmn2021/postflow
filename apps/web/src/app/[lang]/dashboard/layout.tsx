@@ -6,6 +6,7 @@ import { getSession } from "@/lib/server-api";
 import { LogoutAllButton } from "./LogoutAllButton";
 import { LogoutButton } from "./LogoutButton";
 import { NavBar, NavLinks } from "./NavLinks";
+import { VerifyEmailBanner } from "./VerifyEmailBanner";
 
 // Every dashboard page: a top bar (logo, agency, who's logged in, language, log out), the sections
 // (home, clients, posts, team) and the page below.
@@ -32,6 +33,9 @@ export default async function DashboardLayout({ children }: LayoutProps<"/[lang]
           <Sections links={links} team={{ href: `/${locale}/dashboard/team`, label: dict.dashboard.nav.team }} />
         </Suspense>
       </header>
+      <Suspense fallback={null}>
+        <EmailReminder />
+      </Suspense>
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
     </div>
   );
@@ -49,6 +53,13 @@ async function Sections({ links, team }: { links: Link[]; team: Link }) {
       <NavLinks links={all} />
     </Suspense>
   );
+}
+
+// "Confirm your email" under the bar, until they do. Nothing else changes for an unconfirmed account.
+async function EmailReminder() {
+  const [locale, dict, { user }] = await Promise.all([getLocale(), getDictionary(), getSession()]);
+  if (user.emailVerified) return null;
+  return <VerifyEmailBanner locale={locale} email={user.email} t={dict.dashboard} errors={dict.errors} />;
 }
 
 async function UserBar() {

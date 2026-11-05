@@ -14,13 +14,14 @@ const invalidCredentials = () =>
 export const notLoggedIn = () => new UnauthorizedException({ code: "UNAUTHENTICATED", message: "Please log in" });
 
 // The columns a signed-in user and their agency are sent to the website with - passwordHash never is.
-const sessionSelect = {
+export const sessionSelect = {
   id: true,
   agencyId: true, // every query in a feature is scoped by it: WHERE "agencyId" = user.agencyId
   name: true,
   email: true,
   role: true,
   sessionVersion: true, // checked against the token's on every request - never sent to the website
+  emailVerifiedAt: true,
   agency: { select: { id: true, name: true, slug: true, plan: true } },
 } satisfies Prisma.UserSelect;
 
@@ -28,8 +29,9 @@ const sessionSelect = {
 export type SessionUser = Prisma.UserGetPayload<{ select: typeof sessionSelect }>;
 
 // { user, agency } - the same shape for register, login and /me.
-export function toSession({ id, name, email, role, agency }: SessionUser) {
-  return { user: { id, name, email, role }, agency };
+// emailVerified: false = the dashboard shows "confirm your email" with a button to send it again.
+export function toSession({ id, name, email, role, emailVerifiedAt, agency }: SessionUser) {
+  return { user: { id, name, email, role, emailVerified: emailVerifiedAt !== null }, agency };
 }
 
 // Which unique column a Prisma "unique constraint failed" (P2002) error is about, if any.

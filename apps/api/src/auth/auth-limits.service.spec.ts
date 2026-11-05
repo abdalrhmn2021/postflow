@@ -115,3 +115,24 @@ describe("AuthLimits - new accounts", () => {
     expect(counts.get(`${DEFAULT_AUTH_LIMITS.signupTotal.name}:all`)).toBe(1);
   });
 });
+
+describe("AuthLimits - emails asked for", () => {
+  it("sends at most 3 an hour to one address, from any IP, then answers 429 TOO_MANY_EMAILS", async () => {
+    const limits = limitsWith(memoryRedis().redis);
+    for (let i = 0; i < DEFAULT_AUTH_LIMITS.emailPerAddress.max; i++) {
+      await limits.email(`10.0.0.${i}`, "victim@a.test");
+    }
+    const err = await errorOf(limits.email("10.0.0.50", "victim@a.test"));
+    expect(err?.getResponse()).toMatchObject({ code: "TOO_MANY_EMAILS" });
+    await expect(limits.email("10.0.0.50", "other@a.test")).resolves.toBeUndefined();
+  });
+
+  it("limits one IP asking for emails to many addresses", async () => {
+    const limits = limitsWith(memoryRedis().redis);
+    for (let i = 0; i < DEFAULT_AUTH_LIMITS.emailPerIp.max; i++) {
+      await limits.email("1.2.3.4", `person${i}@a.test`);
+    }
+    const err = await errorOf(limits.email("1.2.3.4", "one-more@a.test"));
+    expect(err?.getResponse()).toMatchObject({ code: "TOO_MANY_EMAILS" });
+  });
+});

@@ -59,7 +59,7 @@ postflow/
 │       │   ├── prisma/      database client
 │       │   ├── redis/       Redis connection
 │       │   ├── health/      GET /api/health
-│       │   ├── auth/        sign-up, login, /me, logout, logout-all; limits; AuthGuard + @Public / @Roles / @CurrentUser
+│       │   ├── auth/        sign-up, login, /me, logout, logout-all, forgot/reset password, confirm email; limits; AuthGuard + @Public / @Roles / @CurrentUser
 │       │   ├── brands/      an agency's clients: /api/brands, editors per brand
 │       │   ├── invites/     staff invites: the owner makes a link, the person opens it and makes an account
 │       │   ├── staff/       the agency's people: /api/staff, change a role, remove someone
@@ -68,8 +68,9 @@ postflow/
 │       │   ├── ai/          caption ideas: CaptionWriter (the prompt, the cleanup) and GeminiCaptionWriter
 │       │   ├── review/      client approval: review links and the client's answers (public, the link is the key)
 │       │   ├── publish/     the publish queue (PublishQueue: delayed jobs) and PublisherService (one post -> Meta)
+│       │   ├── mail/        emails: Mailer (what the API needs), BrevoMailer, LogMailer (no key: prints the link); templates.ts (ar/en)
 │       │   ├── media/       file storage: MediaStorage (what the API needs) and CloudinaryStorage (signed uploads, details, delete)
-│       │   ├── common/      shared pieces (request validation)
+│       │   ├── common/      shared pieces (request validation, rate limits in Redis)
 │       │   ├── worker/      worker module: heartbeat, PublishWorker (takes jobs at their time, hourly sweep)
 │       │   ├── main.ts      API entry point
 │       │   └── worker.ts    worker entry point

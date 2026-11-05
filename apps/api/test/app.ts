@@ -5,17 +5,22 @@ import type { NestExpressApplication } from "@nestjs/platform-express";
 import type { App } from "supertest/types.js";
 import { AppModule } from "../src/app.module.js";
 import { AUTH_LIMITS, DEFAULT_AUTH_LIMITS, type AuthLimitsConfig } from "../src/auth/auth-limits.service.js";
+import { Mailer } from "../src/mail/mailer.js";
+import { FakeMailer } from "./fake-mailer.js";
 import { setupApp } from "../src/app.setup.js";
 
 // The whole API, set up exactly like main.ts, for the e2e tests. Runs against a real PostgreSQL and
 // Redis (DATABASE_URL and REDIS_URL from the environment or apps/api/.env).
 // `override` swaps a provider, e.g. a Redis that is down.
-// The sign-up limits are raised: every test file signs up agencies, all from this one machine.
+// Emails go to a FakeMailer (app.get(Mailer) as FakeMailer), never to Brevo - even when apps/api/.env
+// has a BREVO_API_KEY.
+// The sign-up and email limits are raised: every test file signs up agencies, all from this one machine.
 // A test of those limits passes its own (signupLimits) with a name of its own.
 export const TEST_AUTH_LIMITS: AuthLimitsConfig = {
   ...DEFAULT_AUTH_LIMITS,
   signupPerIp: { ...DEFAULT_AUTH_LIMITS.signupPerIp, max: 100_000 },
   signupTotal: { ...DEFAULT_AUTH_LIMITS.signupTotal, max: 100_000 },
+  emailPerIp: { ...DEFAULT_AUTH_LIMITS.emailPerIp, max: 100_000 },
 };
 
 export async function startApp(
@@ -24,6 +29,7 @@ export async function startApp(
 ) {
   const builder = Test.createTestingModule({ imports: [AppModule] });
   builder.overrideProvider(AUTH_LIMITS).useValue(authLimits);
+  builder.overrideProvider(Mailer).useValue(new FakeMailer());
   override?.(builder);
   const moduleRef = await builder.compile();
   const app = setupApp(moduleRef.createNestApplication<NestExpressApplication>());

@@ -3,8 +3,9 @@
 export type Role = "OWNER" | "MANAGER" | "EDITOR";
 
 // POST /auth/register, POST /auth/login and GET /auth/me all answer with this.
+// emailVerified: false = the dashboard reminds them to confirm their email.
 export type Session = {
-  user: { id: string; name: string; email: string; role: Role };
+  user: { id: string; name: string; email: string; role: Role; emailVerified: boolean };
   agency: { id: string; name: string; slug: string; plan: string };
 };
 

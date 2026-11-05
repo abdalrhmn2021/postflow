@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { Role } from "../generated/prisma/client.js";
+import { langSchema, newPassword } from "../auth/auth.schemas.js";
 
 // The same email rule as sign-up: stored lower-case, so "Ali@Mail.com" and "ali@mail.com" are one person.
 const email = z.string().trim().toLowerCase().max(254).pipe(z.email("Invalid email address"));
@@ -16,7 +17,8 @@ const token = z.string().trim().min(20, "Invalid invite").max(100, "Invalid invi
 export const acceptInviteSchema = z.object({
   token,
   name: z.string().trim().min(2, "At least 2 characters").max(80, "At most 80 characters"),
-  password: z.string().min(8, "At least 8 characters").max(128, "At most 128 characters"),
+  password: newPassword,
+  lang: langSchema, // the confirmation email is written in it
 });
 
 export type CreateInviteInput = z.infer<typeof createInviteSchema>;

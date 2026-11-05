@@ -98,6 +98,17 @@ const envSchema = z.object({
     .regex(/^[\w.-]+$/, "GEMINI_MODEL is a model name")
     .default("gemini-flash-latest"),
 
+  // Sends PostFlow's own emails (reset a password, confirm an email) through Brevo (brevo.com, free plan:
+  // 300 emails a day). BREVO_API_KEY: Brevo -> SMTP & API -> API keys (starts with xkeysib-).
+  // EMAIL_FROM: a sender verified in Brevo (Senders, domains -> Senders). Both or neither.
+  // Empty = no email is sent: the link is printed in the API's terminal instead (development).
+  BREVO_API_KEY: z.preprocess(emptyIsUnset, z.string().min(20, "BREVO_API_KEY looks too short").optional()),
+  EMAIL_FROM: z.preprocess(
+    emptyIsUnset,
+    z.string().trim().pipe(z.email("EMAIL_FROM must be an email address")).optional(),
+  ),
+  // The name people see next to the sender.
+  EMAIL_FROM_NAME: z.string().trim().min(1).max(60).default("PostFlow"),
   // Encrypts the pages' access tokens in the database (AES-256-GCM): 32 random bytes, base64.
   //   node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
   // Optional in development (a fixed dev key); required in production. Changing it alone makes every
@@ -145,6 +156,7 @@ export function hidePassword(url: string) {
 export type MetaConfig = { appId: string; appSecret: string; graphVersion: string };
 
 export type CloudinaryConfig = { cloudName: string; apiKey: string; apiSecret: string };
+export type EmailConfig = { brevoApiKey: string; from: string; fromName: string };
 
 // cloudinary://123456789012345:AbCdEf-gHiJ@my-cloud -> { cloudName, apiKey, apiSecret }, or null.
 export function parseCloudinaryUrl(value: string): CloudinaryConfig | null {
@@ -163,12 +175,19 @@ const DEFAULT_REDIS_PREFIX = { development: "dev", test: "test", production: "pr
 type Parsed = z.infer<typeof envSchema>;
 export type Env = Omit<
   Parsed,
-  "JWT_SECRET" | "TOKEN_ENCRYPTION_KEY" | "META_APP_ID" | "META_APP_SECRET" | "REDIS_PREFIX"
+  | "JWT_SECRET"
+  | "TOKEN_ENCRYPTION_KEY"
+  | "META_APP_ID"
+  | "META_APP_SECRET"
+  | "REDIS_PREFIX"
+  | "BREVO_API_KEY"
+  | "EMAIL_FROM"
 > & {
   JWT_SECRET: string;
   REDIS_PREFIX: string; // never empty: "dev", "test", "prod" or the value set
   TOKEN_ENCRYPTION_KEY: string;
   META: MetaConfig | undefined; // undefined = connecting pages is off
+  EMAIL: EmailConfig | undefined; // undefined = emails are printed in the terminal, not sent
 };
 
 // Used by ConfigModule.forRoot({ validate }). Returns the cleaned values (defaults filled in, PORT a number).
@@ -178,7 +197,16 @@ export function validateEnv(raw: Record<string, unknown>): Env {
     const problems = result.error.issues.map((i) => `  - ${i.path.join(".") || "env"}: ${i.message}`);
     throw new Error(`Invalid environment variables:\n${problems.join("\n")}\nSee .env.example.`);
   }
-  const { JWT_SECRET, TOKEN_ENCRYPTION_KEY, META_APP_ID, META_APP_SECRET, REDIS_PREFIX, ...env } = result.data;
+  const {
+    JWT_SECRET,
+    TOKEN_ENCRYPTION_KEY,
+    META_APP_ID,
+    META_APP_SECRET,
+    REDIS_PREFIX,
+    BREVO_API_KEY,
+    EMAIL_FROM,
+    ...env
+  } = result.data;
   const production = env.NODE_ENV === "production";
 
   const problems: string[] = [];
@@ -186,6 +214,9 @@ export function validateEnv(raw: Record<string, unknown>): Env {
   if (production && !TOKEN_ENCRYPTION_KEY) problems.push("TOKEN_ENCRYPTION_KEY: required in production");
   if (Boolean(META_APP_ID) !== Boolean(META_APP_SECRET)) {
     problems.push("META_APP_ID and META_APP_SECRET: set both, or neither");
+  }
+  if (Boolean(BREVO_API_KEY) !== Boolean(EMAIL_FROM)) {
+    problems.push("BREVO_API_KEY and EMAIL_FROM: set both, or neither");
   }
   if (problems.length > 0) {
     throw new Error(`Invalid environment variables:\n${problems.map((p) => `  - ${p}`).join("\n")}\nSee .env.example.`);
@@ -199,6 +230,10 @@ export function validateEnv(raw: Record<string, unknown>): Env {
     META:
       META_APP_ID && META_APP_SECRET
         ? { appId: META_APP_ID, appSecret: META_APP_SECRET, graphVersion: env.META_GRAPH_VERSION }
+        : undefined,
+    EMAIL:
+      BREVO_API_KEY && EMAIL_FROM
+        ? { brevoApiKey: BREVO_API_KEY, from: EMAIL_FROM, fromName: env.EMAIL_FROM_NAME }
         : undefined,
   };
 }

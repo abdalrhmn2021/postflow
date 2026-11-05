@@ -7,6 +7,8 @@ export type AuthLimitsConfig = {
   loginPerAccount: Limit;
   signupPerIp: Limit;
   signupTotal: Limit;
+  emailPerIp: Limit;
+  emailPerAddress: Limit;
 };
 
 // Swapped in the e2e tests (test/app.ts): they sign up many agencies from one machine.
@@ -27,6 +29,11 @@ export const DEFAULT_AUTH_LIMITS: AuthLimitsConfig = {
   // whole site - so a script can't fill the database with fake agencies, even from many IPs.
   signupPerIp: { name: "signups", max: 5, windowSeconds: 60 * 60 },
   signupTotal: { name: "signups-all", max: 100, windowSeconds: 60 * 60 },
+  // Emails someone asks for (forgot password, send the confirmation again): 10 an hour from one IP,
+  // 3 an hour to one address - nobody can flood a person's inbox through us, or use up Brevo's
+  // 300 a day. Counted for every address, with or without an account, so it tells nobody which exist.
+  emailPerIp: { name: "emails", max: 10, windowSeconds: 60 * 60 },
+  emailPerAddress: { name: "emails-to", max: 3, windowSeconds: 60 * 60 },
 };
 
 // The email as a short hash: Redis keys don't hold people's emails in plain text.
@@ -68,5 +75,13 @@ export class AuthLimits {
     const wait =
       (await this.limiter.hit(this.limits.signupPerIp, ip)) ?? (await this.limiter.hit(this.limits.signupTotal, "all"));
     if (wait !== null) throw tooMany("TOO_MANY_SIGNUPS", "Too many new accounts, try again later", wait);
+  }
+
+  // Before sending an email someone asked for. 429 TOO_MANY_EMAILS.
+  async email(ip: string, address: string): Promise<void> {
+    const wait =
+      (await this.limiter.hit(this.limits.emailPerIp, ip)) ??
+      (await this.limiter.hit(this.limits.emailPerAddress, emailKey(address)));
+    if (wait !== null) throw tooMany("TOO_MANY_EMAILS", "Too many emails asked for, try again later", wait);
   }
 }

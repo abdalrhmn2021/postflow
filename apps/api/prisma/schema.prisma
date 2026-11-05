@@ -40,25 +40,49 @@ model Agency {
 }
 
 model User {
-  id             String   @id @default(uuid())
+  id              String    @id @default(uuid())
   // Unique across the whole site: the login form asks for email + password only, not the agency.
-  email          String   @unique
-  name           String
-  passwordHash   String // never the password itself
-  role           Role     @default(EDITOR)
+  email           String    @unique
+  name            String
+  passwordHash    String // never the password itself
+  role            Role      @default(EDITOR)
   // Inside every login token. Adding 1 ends every login of this user at once, on every device
   // ("log out of all devices", a new password): tokens made with an older number are refused.
-  sessionVersion Int      @default(0)
-  agencyId       String
-  agency         Agency   @relation(fields: [agencyId], references: [id], onDelete: Cascade)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  sessionVersion  Int       @default(0)
+  // When they opened the link in the confirmation email. null = not confirmed yet: everything still
+  // works, the dashboard just reminds them.
+  emailVerifiedAt DateTime?
+  agencyId        String
+  agency          Agency    @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   brands      BrandMember[]
   invitesSent Invite[]
   posts       Post[]
+  emailTokens EmailToken[]
 
   @@index([agencyId])
+}
+
+enum EmailTokenPurpose {
+  VERIFY_EMAIL // "confirm your email" - 24 hours
+  RESET_PASSWORD // "choose a new password" - 1 hour
+}
+
+// The secret behind a link sent by email. Like invites: the link holds the secret, the database only
+// its SHA-256. A reset link is deleted when used (works once); a confirm link works until it expires.
+// A new link of a kind deletes the user's older ones of that kind.
+model EmailToken {
+  id        String            @id @default(uuid())
+  userId    String
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purpose   EmailTokenPurpose
+  tokenHash String            @unique
+  expiresAt DateTime
+  createdAt DateTime          @default(now())
+
+  @@index([userId, purpose])
 }
 
 // An agency's client (a business whose pages the agency runs).

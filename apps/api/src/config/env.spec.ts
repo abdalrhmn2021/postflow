@@ -95,6 +95,19 @@ describe("validateEnv", () => {
     expect(validateEnv(prod).META).toBeUndefined();
   });
 
+  it("Email (Brevo): both or neither, a real sender address, PostFlow as the default name", () => {
+    expect(validateEnv(base).EMAIL).toBeUndefined();
+    expect(validateEnv({ ...base, BREVO_API_KEY: "", EMAIL_FROM: "" }).EMAIL).toBeUndefined();
+    const key = "xkeysib-0123456789abcdef0123456789";
+    expect(validateEnv({ ...base, BREVO_API_KEY: key, EMAIL_FROM: " Me@Gmail.com " }).EMAIL).toEqual({
+      brevoApiKey: key,
+      from: "Me@Gmail.com",
+      fromName: "PostFlow",
+    });
+    expect(() => validateEnv({ ...base, BREVO_API_KEY: key })).toThrow(/set both, or neither/);
+    expect(() => validateEnv({ ...base, BREVO_API_KEY: key, EMAIL_FROM: "not-an-email" })).toThrow(/EMAIL_FROM/);
+  });
+
   it("TOKEN_ENCRYPTION_KEY: 32 bytes; a dev key in development, required in production", () => {
     expect(Buffer.from(validateEnv(base).TOKEN_ENCRYPTION_KEY, "base64")).toHaveLength(32);
     expect(validateEnv({ ...base, TOKEN_ENCRYPTION_KEY: KEY }).TOKEN_ENCRYPTION_KEY).toBe(KEY);

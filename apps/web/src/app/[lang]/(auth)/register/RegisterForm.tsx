@@ -55,6 +55,7 @@ export function RegisterForm({ locale, t, errors, fields }: Props) {
           name: data.get("name"),
           email: data.get("email"),
           password: data.get("password"),
+          lang: locale, // the confirmation email is written in the site's language
         },
       });
       router.replace(`/${locale}/dashboard`);

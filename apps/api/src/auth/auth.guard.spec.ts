@@ -21,6 +21,7 @@ const editor: SessionUser = {
   email: "editor@agency.test",
   role: Role.EDITOR,
   sessionVersion: 2,
+  emailVerifiedAt: null,
   agency: { id: "a1", name: "Agency", slug: "agency", plan: "FREE" },
 };
 
